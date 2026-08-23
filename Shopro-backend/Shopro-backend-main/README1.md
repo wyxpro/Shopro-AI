@@ -20,7 +20,7 @@
 
 **Shopro AI 厂商运营后台 (Shopro-backend)** 是专为 **Shopro AI 抖音/TikTok 电商 AIGC 带货视频平台** 设计的高性能、企业级运营管理与管控中心。系统聚焦于多租户 SaaS 平台的商业化闭环运维、算力调度监控、风控合规审计以及客户全生命周期管理。
 
-架构设计上，本项目采用了**前端高保真敏捷原型 + MSW 原生零成本 Mock 演示 + 无缝切换 Spring Boot REST API 架构**。前端基于 Vue 3 + TypeScript + Vite + Element Plus 构建，预留了严格的统一 API 数据响应结构与 RBAC 权限边界。运营人员不仅可以通过直观的数据看板洞察全局履算与充值交易，还能实时监控 AI 视频/脚本生成任务状态、管控算力积分扣减与退款、处置内容敏感词风险以及管理工单与套餐版本。
+架构设计上，本项目采用了**前端高保真敏捷原型 + MSW 原生零成本 Mock 演示 + 无缝切换 Spring Boot REST API 架构**。前端基于 Vue 3 + TypeScript + Vite + Element Plus 构建，预留了严格的统一 API 数据响应结构与 RBAC 权限边界。运营人员不仅可以通过直观的数据看板洞察全局履约与充值交易，还能实时监控 AI 视频/脚本生成任务状态、管控算力积分扣减与退款、处置内容敏感词风险以及管理工单与套餐版本。
 
 ### ⚡ 核心价值与业务定位
 * 📊 **全链路运维监控**：实时展示算力消耗、AI 履约成功率、订单净支付金额与大模型服务健康度。
@@ -83,8 +83,8 @@ Shopro-backend/
     ├── pnpm-lock.yaml            # pnpm 依赖锁定文件
     ├── vite.config.ts            # Vite 构建配置与 Manual Chunks 分包策略
     ├── tsconfig.json             # TypeScript 全局配置
-    ├── README.md                 # 厂商运营后台全量评估与设计文档
-    ├── README1.md                # 标准评估文档备份
+    ├── README.md                 # 快速上手 README
+    ├── README1.md                # 厂商运营后台全量评估与设计文档
     ├── admin-architecture-spec.md# 厂商后台架构与规格说明书
     ├── 项目结构与功能模块说明.md   # 核心功能模块与接口联调约定
     ├── front-README.md           # 商家端/C端系统说明文档
