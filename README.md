@@ -2,11 +2,13 @@
 
 <p align="center">
   <img alt="React" src="https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=white" />
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.5.3-3178C6?logo=typescript&logoColor=white" />
-  <img alt="Vite" src="https://img.shields.io/badge/Vite-5.4.1-646CFF?logo=vite&logoColor=white" />
+  <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3.5.13-4FC08D?logo=vuedotjs&logoColor=white" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.7.2-3178C6?logo=typescript&logoColor=white" />
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-6.0.7-646CFF?logo=vite&logoColor=white" />
   <img alt="TailwindCSS" src="https://img.shields.io/badge/TailwindCSS-3.4.11-06B6D4?logo=tailwindcss&logoColor=white" />
+  <img alt="Element Plus" src="https://img.shields.io/badge/Element_Plus-2.9.1-409EFF?logo=elementplus&logoColor=white" />
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-2.103.1-3FCF8E?logo=supabase&logoColor=white" />
-  <img alt="Deno" src="https://img.shields.io/badge/Edge_Functions-Deno-000000?logo=deno&logoColor=white" />
+  <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?logo=springboot&logoColor=white" />
   <img alt="AI" src="https://img.shields.io/badge/AI-DeepSeek_v4_Flash-blue" />
   <img alt="Audio" src="https://img.shields.io/badge/Audio-CosyVoice2_TeleSpeech-orange" />
   <img alt="Video" src="https://img.shields.io/badge/Video-Seedance_2.0-violet" />
@@ -21,11 +23,14 @@
 
 **Shopro-AI 电商 AIGC 带货视频系统** 是一款面向国内外电商商家（如抖音、TikTok、快手、小红书、Amazon、Shopee 等）的商业化 SaaS 平台。该系统通过深度融合先进的多模态大模型与全链路智能工作流，解决商家在短视频营销中面临的“文案撰写难、数字人/外籍演员贵、剪辑成本高、多语言本地化差、跨平台发布繁琐”等核心痛点。
 
-系统支持从「商品信息输入/URL 卖点提取 ➔ AI 智能脚本生成 ➔ 数字人选择与克隆 ➔ 多语言智能翻译 ➔ 分镜编辑 ➔ 素材混剪 ➔ 视频异步合成 ➔ 真实积分扣除与日志审计 ➔ 多平台一键发布与数据回流」的完整商业闭环，将传统的五人工作流压缩为“一人 + AI”，帮助商家以极低成本高速量产高转化的爆款短视频。
+系统构建了**商家端创作系统（C端/B端） + 厂商运营后台管理中台（Shopro-backend）** 的双端企业级解耦架构：
+1. **商家创作端**：支持从「商品信息输入/URL 卖点提取 ➔ AI 智能脚本生成 ➔ 数字人选择与克隆 ➔ 多语言智能翻译 ➔ 分镜编辑 ➔ 素材混剪 ➔ 视频异步合成 ➔ 真实积分扣除与日志审计 ➔ 多平台一键发布与数据回流」的完整商业闭环，将传统的五人工作流压缩为“一人 + AI”，帮助商家以极低成本高速量产高转化的爆款短视频。
+2. **厂商运营端**：提供企业级多租户 SaaS 运维中台，覆盖运营总览、算力积分调账、AI 工作流 Attempt 尝试级追踪与退款、内容风控证据链审计、订单与套餐版本快照及 MSW 零成本演示重置。
 
 ### ⚡ 核心价值与特色
 *   **最新 1080P 核心实操演示视频**：品牌官网（`LandingPage.tsx`）集成 `public/Shopro.mp4` 1080P 超清全流程带货实操演示视频，支持全屏播放、进度控制及音量调节。
 *   **真实积分扣减与流水明细全闭环**：基于 `deductUserCredits` 机制，生成视频时真实校验并扣除 10 积分，自动在 `credit_logs` 表中写入带有时间戳、扣除额度（`-10`）、剩余积分及事项描述的审计日志，支持全站 `credits_changed` 实时广播。
+*   **双端解耦与厂商中台管控**：独立打造 Vue 3 + Element Plus 厂商运营后台 (`Shopro-backend`)，支持算力人工调账、故障任务算力退款、敏感词风控审计与秒级接入 Spring Boot。
 *   **极致降本**：无需聘请外籍主播与剪辑师，注册送 50 初始积分，生成单条视频消耗 10 积分（10 积分 = 1 元），综合成本降至不足 1 元。
 *   **极致增效**：从商品 URL 到生成多语种情感数字人口播视频仅需 3-5 分钟。
 *   **转化导向**：引入营销学“说服框架”，对文案进行 CoT 分层打标签，自动映射数字人情绪。
@@ -40,28 +45,29 @@
 
 | 分类 | 技术/依赖 | 版本/说明 | 用途 |
 |---|---|---:|---|
-| 核心框架 | React | 18.3.1 | 组件化 UI 与状态驱动渲染 |
-| 开发语言 | TypeScript | 5.5.3 | 强类型约束，提升工程可维护性 |
-| 构建工具 | Vite | 5.4.1 | 极速热更新，生产资源打包优化 |
-| 路由管理 | react-router-dom | 6.26.2 | 单页路由及受保护路由 |
-| 状态/异步 | @tanstack/react-query | 5.56.2 | 异步数据缓存、乐观更新与生命周期管理 |
-| UI 组件 | Radix UI + shadcn/ui | 基础组件 | Dialog、Select、Tabs、Tooltip、Sheet 等 |
-| 样式系统 | Tailwind CSS / tailwindcss-animate | 3.4.11 | 原子化布局、过渡及高精度动效 |
-| 动画驱动 | framer-motion | 12.4.10 | 页面进入、列表卡片拖拽与过渡动画 |
-| 数据可视化 | recharts | 2.12.7 | 流量数据看板、雷达图、转化漏斗图 |
-| 文件导出 | xlsx / jspdf / qrcode | 最新版 | 支持分镜 Excel 导出、脚本 PDF 以及微信支付二维码 |
+| 核心框架 | React / Vue | 18.3.1 / 3.5.13 | 商家创作端 (React 18) 与 厂商运营后台 (Vue 3) |
+| 开发语言 | TypeScript | 5.7.2 | 全链路强类型约束，提升工程可维护性 |
+| 构建工具 | Vite | 6.0.7 / 5.4.1 | 极速热更新，生产资源打包优化与 Manual Chunks 分包 |
+| 路由管理 | react-router-dom / Vue Router | 6.26.2 / 4.5.0 | 单页路由、受保护路由及 RBAC 权限路由守卫 |
+| 状态/异步 | @tanstack/react-query / Pinia | 5.56.2 / 2.3.0 | 异步数据缓存、全局 Auth 会话与乐观更新 |
+| UI 组件 | Radix UI + Element Plus | 基础组件 / 2.9.1 | 商家端组件与厂商后台企业级表格/表单/仪表盘 |
+| 样式系统 | Tailwind CSS / Vanilla CSS | 3.4.11 / CSS3 | 原子化布局、高精度玻璃态与后台全局主题覆盖 |
+| 动画与图表 | framer-motion / Recharts / ECharts | 12.4.10 / 5.6.0 | 页面动效、商家端流量看板与厂商履算趋势折线图/环形图 |
+| API 模拟 | MSW (Mock Service Worker) | 2.7.0 | 厂商后台 Service Worker 请求拦截与浏览器端数据持久化 |
 | 代码质量 | Biome / tsgo | 2.4.5 / 0.0.1 | 极速 Lint、格式化及预构建类型检查 |
 
 ### ⚙️ 后端与数据服务
 
 | 分类 | 技术/服务 | 说明 | 项目中的作用 |
 |---|---|---|---|
-| 云服务 BaaS | Supabase | Auth、DB、Storage、Edge Functions | 全栈后端云服务托管 |
+| 云服务 BaaS | Supabase | Auth、DB、Storage、Edge Functions | 商家端全栈后端云服务托管 |
+| 厂商后端标准 | Spring Boot | 3.x REST Server | 厂商后台 REST API (`/api/admin/**`) 生产接入标准 |
 | 数据库 | PostgreSQL | 由 Supabase 托管 | RLS 物理数据隔离，pgvector 向量模糊搜索 |
-| 账户认证 | Supabase Auth | 邮箱/手机登录与会话管理 | JWT 登录态维护、权限路由钩子 |
+| 账户认证 | Supabase Auth / JWT | 邮箱/手机登录与 JWT 会话 | 商家端与厂商后台 RBAC 权限校验与 Token 刷新 |
 | 边缘计算 | Supabase Edge Functions | Deno 运行时 | AI 编排、支付闭环、竞品抓取、团队协作接口 |
 | 实时流式 | SSE + eventsource-parser | 前端 `src/lib/sse.ts` 封装 | 实现打字机流式（SSE）文本响应解析 |
 | 积分流水 | `deductUserCredits` + `credit_logs` | `src/hooks/useCredits.ts` | 真实扣减积分余额、全站事件广播并写入消费明细 |
+| 统一 API 契约 | `ApiResponse<T>` / `PageResult<T>` | `{ code, message, data, traceId }` | 前后端统一响应外层结构与分页传输格式 |
 
 ### 🤖 AI 服务与多模态模型
 
@@ -82,8 +88,13 @@
 
 ```text
 Shopro AI/
-├── Shopro-backend/                # 厂商运营后台管理系统 (Vue 3 + Vite + Element Plus + MSW + Spring Boot REST API)
-│   └── Shopro-backend-main/
+├── Shopro-backend/                 # 🏢 厂商运营后台管理系统 (Vue 3 + Element Plus + MSW / Spring Boot)
+│   └── Shopro-backend-main/        # 厂商后台源码、API 模块与 MSW 模拟引擎
+│       ├── src/api/                # 厂商后台 REST API (auth, billing, credits, risk, system...)
+│       ├── src/views/              # 8 大业务域运营管理页面 (Dashboard, Users, AI-Ops, Risk...)
+│       ├── src/mocks/              # MSW 浏览器端 Mock 数据库与状态重置引擎
+│       ├── README.md               # 厂商运营后台详细技术与架构设计文档
+│       └── README1.md              # 厂商运营后台全量评估标准文档
 ├── public/
 │   └── Shopro.mp4                 # 官网最新 1080P 高清全流程带货实操演示视频
 ├── src/
@@ -272,48 +283,41 @@ Shopro AI/
 *   **团队协作**：支持主账号创建团队空间，通过邮箱发送邀请凭证，配置管理员或协作者角色，共享素材库与作品集。
 *   **OpenAPI 调试**：面向大商户或 ERP 系统，提供 `ak_...` 自定义 API 密钥生成、Revoke 控制，并附带在线交互式 API 沙箱调试器。
 
-### 9. 🏢 Shopro-backend 厂商运营后台管理系统
-*   **架构解耦与敏捷原型**：基于 Vue 3 + TypeScript + Vite + Element Plus + Pinia + ECharts + MSW 构建独立的 B2B 厂商运营管理中台，与商家前端解耦，预留无缝对接 Spring Boot REST API 架构。
-*   **7 大核心管控模块**：
-    - 📊 **运营总览看板 (Dashboard)**：实时监控全平台 AI 履算成功率、订单净支付金额、风险待办及 ECharts 履约趋势/任务分布图。
-    - 👥 **客户全景与算力调账 (Customers & Credits)**：用户全景视窗、能力/并发配额限制，以及带审计追溯的人工算力加/扣调整。
-    - 🤖 **AI 任务中心与 Attempt 级日志 (AI Operations)**：下探至 Attempt 尝试级记录，提供任务强切、失败重试与“故障失败算力退款”。
-    - 🛡️ **智能内容风控治理 (Risk Governance)**：捕获涉黄、涉政、违禁词及版权风险事件，提供上下文证据链展示、处置（阻断/告警/忽略）与商家申诉二次复核。
-    - 💳 **订单、退款与套餐快照 (Billing & Package)**：异常订单权益一键补发、退款流转审批及算力套餐版本快照。
-    - 🎫 **客服工单中心 (Tickets)**：工单创建、响应派转与处理记录追溯。
-    - ⚙️ **系统运维与敏捷恢复 (System & Demo Reset)**：下游 AI 服务延迟监控、RBAC 角色权限控制，以及 Demo 模式下 MSW 种子数据一键恢复。
-*   **零成本 Mock 与 Spring Boot 接轨**：预留规范统一接口 `ApiResponse<T>` (`{ code, message, data, traceId }`) 与分页结构 `PageResult<T>` (`{ items, total, page, pageSize }`)，仅需配置 `.env` 变量 `VITE_USE_MOCK=false` 即可秒级无缝接入 Spring Boot 后端 REST API (`/api/admin/**`)。
+### 9. 🏢 厂商运营后台管理系统 (Shopro-backend)
+*   **运营总览看板 (Dashboard)**：聚合展示 AI 履约成功率、订单净支付金额、服务影响指数及 ECharts 履约趋势与算力占比图表。
+*   **客户与算力积分管理 (Customers & Credits)**：查看商家用户使用全景，动态配置能力与并发配额，支持带审计追踪的人工算力加/扣调账。
+*   **AI 任务中心与 Attempt 日志下探 (AI Operations)**：工作流实时追踪，下探查看任务多次 retry 尝试记录 (Attempt)、第三方接口耗时与错误码，提供任务强切、失败重试及“故障失败算力退款”。
+*   **智能内容风控治理 (Risk Governance)**：捕获涉黄、涉政、敏感违禁词事件，展示原始提示词与生成上下文证据链，支持处置（阻断/告警/忽略）与商家申诉二次复核。
+*   **订单、退款与套餐版本快照 (Billing & Packages)**：提供订单流水明细与异常订单“权益一键补发”，覆盖退款申请审批全生命周期，支持算力套餐版本快照创建。
+*   **系统运维与 MSW 零成本恢复 (System & Demo Reset)**：监控下游 AI 服务 health 状态，基于 RBAC 管理权限角色，支持在 Demo 模式下一键恢复 MSW 演示种子数据。
+*   **生产环境 Spring Boot 无缝对接**：前端 API 统一为 `/api/admin/**`，采用 `ApiResponse<T>` / `PageResult<T>` 统一契约。生产环境修改 `VITE_USE_MOCK=false` 即可秒级接轨真实后端。
 
 ---
 
 ## ⚙️ 部署指南
 
-### 环境要求
+### 1. 商家创作端部署 (React 18 + Supabase)
+
+#### 环境要求
 *   **Node.js**: 18.0 或更高版本
 *   **包管理器**: npm / pnpm
 *   **Supabase CLI**: 最新稳定版 (本地 Deno 测试及数据库迁移推送)
 
-### 1. 克隆与安装依赖
+#### 步骤说明
 ```bash
-cd "Shopro AI"
+# 1. 克隆与安装依赖
 npm install
-```
 
-### 2. 配置前端环境变量
-在项目根目录创建 `.env` 文件：
+# 2. 本地开发与代码质检
+npm run dev      # 启动本地开发服务
+npm run lint     # 执行代码检查与格式化
+npm run build    # 编译生成生产包
 
-### 3. 部署数据库迁移
-连接你的 Supabase 项目并应用迁移（包含全部 21 个 SQL 迁移文件）：
-```bash
+# 3. 部署 Supabase 数据库迁移 (应用全部 21 个 SQL 迁移文件)
 supabase link --project-ref <your-project-ref>
 supabase db push
-```
 
-### 4. 配置服务端 Secret
-在 Supabase 控制台或使用 CLI 设置 Secrets：
-
-### 5. 部署边缘函数 (部署全部 16 个 Edge Functions)
-```bash
+# 4. 部署 16 个 Deno Edge Functions 边缘函数
 supabase functions deploy ai-assistant
 supabase functions deploy deepseek-v4-pro
 supabase functions deploy stepaudio
@@ -333,21 +337,44 @@ supabase functions deploy wenxin-text-generation
 supabase functions deploy setup-demo
 ```
 
-### 6. 本地开发与代码质检
+### 2. 厂商运营后台部署 (Shopro-backend)
+
 ```bash
-# 启动本地开发服务 (基于 vite.config.dev.ts)
-npm run dev
+# 1. 进入厂商运营后台工程目录
+cd Shopro-backend/Shopro-backend-main
 
-# 执行类型检查、Biome 格式化、Tailwind 语法校验及测试构建
-npm run lint
+# 2. 安装 pnpm 依赖
+pnpm install
 
-# 生成生产包
-npm run build
+# 3. 启动开发服务器 (默认启用 MSW Mock 模拟)
+pnpm dev
+
+# 4. 编译生产产物
+pnpm build
 ```
+编译产物位于 `dist/`，可直接发布到 EdgeOne / Cloudflare Pages 等静态托管平台，或将 `dist/` 复制到 Spring Boot 的 `src/main/resources/static` 目录下。
 
 ---
 
 ## 📦 API 接口
+
+### 🏢 厂商运营后台 REST API (`/api/admin/**`)
+
+| 业务模块 | HTTP 方法 | Endpoint 路径 | 所需权限 | 功能描述 |
+|---|---|---|---|---|
+| **认证授权** | `POST` | `/api/admin/auth/login` | 无 | 管理员登录，返回 JWT Token 与用户信息 |
+| **运营总览** | `GET` | `/api/admin/dashboard/overview` | `dashboard:view` | 获取看板核心指标与环比数据 |
+| | `GET` | `/api/admin/dashboard/fulfillment-trend` | `dashboard:view` | 获取履约成功率与趋势折线图数据 |
+| **客户与算力**| `GET` | `/api/admin/customers/users` | `customers:view` | 分页查询商家用户列表及算力使用情况 |
+| | `POST` | `/api/admin/credits/adjust` | `customers:view` | 人工加/扣算力积分，记录调账日志 |
+| **AI 任务中心**| `GET` | `/api/admin/ai/workflows` | `workflow:view` | 分页查询 AI 脚本/语音/视频工作流任务 |
+| | `GET` | `/api/admin/ai/workflows/:id` | `workflow:view` | 获取指定工作流详情与 Attempt 尝试日志 |
+| | `POST` | `/api/admin/ai/workflows/:id/refund` | `workflow:view` | 对因故障失败的任务执行算力人工退款 |
+| **风险与风控**| `GET` | `/api/admin/risk/events` | `risk:view` | 分页查询敏感词与内容风险事件及证据链 |
+| | `POST` | `/api/admin/risk/events/:id/decide` | `risk:view` | 提交风险处置决定（阻断/告警/忽略） |
+| **订单与计费**| `GET` | `/api/admin/billing/orders` | `billing:view` | 分页查询充值与套餐购买订单 |
+| | `POST` | `/api/admin/billing/orders/:id/reissue`| `billing:view` | 对异常订单手动执行“权益一键补发” |
+| **系统与运维**| `POST` | `/api/admin/system/demo-data/reset` | `system:view` | （Demo模式）一键恢复 MSW 演示种子数据 |
 
 ### 🌐`ai-assistant` — 统一 AI 网关
 
@@ -436,14 +463,14 @@ npm run build
 
 ### 📌 总结
 
-Shopro AI 是一套面向 **带货短视频量产** 领域的一站式 SaaS 系统。项目融合了 DeepSeek-V4-Flash、CosyVoice2-0.5B、TeleSpeechASR、Seedance 2.0 等前沿多模态大模型，以极高的工程化完成度打通了“文案-配音-画面-积分审计-数据回流-团队协作-支付”的商业化完整闭环。具有极高的商业化落地价值和出海想象空间。
+Shopro AI 是一套面向 **带货短视频量产** 领域的一站式 SaaS 系统。项目融合了 DeepSeek-V4-Flash、CosyVoice2-0.5B、TeleSpeechASR、Seedance 2.0 等前沿多模态大模型，以极高的工程化完成度打通了“商家创作端 + 厂商运营中台”的完整商业化双端闭环，包含“文案-配音-画面-积分审计-风控复核-算力退款-数据回流-团队协作-支付”全链条功能，具有极高的商业化落地价值和出海想象空间。
 
 ### 🗺️ 未来 GTM 路线图
 
 | 阶段 | 时间 | 里程碑 |
 |------|------|--------|
 | 🌱 公测种子期 | 2026 Q2 | 正式上线，获客 5000+ 商家，付费转化率 ≥ 8% |
-| 📈 规模商业化 | 2026 Q3-Q4 | 联合 20+ 头部 MCN/ERP，月 MRR 突破 ¥20 万 |
+| 📈 规模商业化 | 2026 Q3-Q4 | 联合 20+ 头部 MCN/ERP，月 MRR 突破 ¥20 万，厂商中台接入 Spring Boot |
 | 🌐 跨境出海版 | 2027 | TikTok Shop/Lazada/Shopee 一键发布，海外节点上线 |
 | 🏭 生态开放 | 2027+ | 完全开放 OpenAPI，接入聚水潭/旺店通，打造无人值守视频工场 |
 
