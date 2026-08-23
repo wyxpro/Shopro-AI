@@ -734,8 +734,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* 桌面端侧边栏 */}
-      <aside className="hidden lg:flex flex-col w-64 shrink-0">
+      {/* 桌面端侧边栏 (固定在左侧，不随右侧页面上下滑动) */}
+      <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-sidebar-border/50">
         <SidebarContent />
       </aside>
 
@@ -745,7 +745,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {!isVideoEditPage && (() => {
           const isDarkHeader = isVideoCreatePage;
           return (
-            <header className={cn("flex items-center gap-3 px-4 h-14 border-b shrink-0", isDarkHeader ? "bg-[#0e0e12] border-white/5" : "bg-white border-zinc-200")}>
+            <header className={cn("flex items-center gap-3 px-4 h-14 border-b shrink-0 sticky top-0 z-30 backdrop-blur-sm", isDarkHeader ? "bg-[#0e0e12]/95 border-white/5" : "bg-white/95 dark:bg-card/95 border-zinc-200 dark:border-border")}>
               {/* 移动端菜单 */}
               <div className="lg:hidden">
                 <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
