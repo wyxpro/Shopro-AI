@@ -59,17 +59,6 @@
 | 缓存与锁 | Redis | Dynamic Redisson | 算力扣减悲观分布式锁、Token 黑名单与数据缓存 |
 | 数据响应契约 | `ApiResponse<T>` | `{ code, message, data, traceId }` | 统一前端与后端错误处理及链路追踪 |
 | 分页响应契约 | `PageResult<T>` | `{ items, total, page, pageSize }` | 统一所有列表接口的分页传输格式 |
-
-### 🤖 AI 服务与多模态模型调度
-
-| 模块 / 能力 | 对接底层 AI 模型 | 运营后台控制粒度 | 业务用途与治理 |
-|---|---|---|---|
-| **文本大模型** | DeepSeek-V4-Flash / DeepSeek R1 | 营销脚本生成吞吐量、失败重试率 | 监控文案 CoT 脚本生成、多语言翻译任务 |
-| **语音大模型** | CosyVoice2 / TeleSpeech ASR | 声音克隆与音视频合成耗时 | 监控配音合成成功率、情绪极值映射 |
-| **视频生成** | Seedance 2.0 / Sora / Kling | 视频渲染算力消耗（GPU Tokens） | 监控分镜混剪与物理级短视频生成任务 |
-| **图像/封面** | Flux 1.1 Pro | 封面候选图生成频次 | 监控 AI 带货短视频封面设计吞吐 |
-| **向量检索** | OpenAI Text-Embedding | RAG 知识库命中率与向量耗时 | 监控电商爆款话术 Few-shot 向量检索效率 |
-
 ---
 
 ## 📁 目录结构
