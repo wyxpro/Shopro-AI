@@ -54,7 +54,7 @@ const navGroups = [
     label: '主要功能',
     items: [
       { path: '/video/create', label: '工作台', icon: Video },
-      { path: '/product-selection', label: '全球选品', icon: ShoppingBag },
+      { path: '/product-selection', label: '智能选品', icon: ShoppingBag },
       { path: '/products', label: '商品管理', icon: Package },
       { path: '/avatars', label: '数字人库', icon: Users2 },
       { path: '/video/edit', label: '视频剪辑', icon: Scissors },
