@@ -735,7 +735,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex min-h-screen w-full bg-background">
       {/* 桌面端侧边栏 (固定在左侧，不随右侧页面上下滑动) */}
-      <aside className="hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-sidebar-border/50">
+      <aside className={cn(
+        "hidden lg:flex flex-col w-64 shrink-0 sticky top-0 h-screen",
+        !isVideoCreatePage && "border-r border-sidebar-border/50"
+      )}>
         <SidebarContent />
       </aside>
 
