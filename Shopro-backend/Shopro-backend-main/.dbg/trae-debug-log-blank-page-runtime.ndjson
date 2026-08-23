@@ -1,0 +1,34 @@
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "A", "location": "src/main.ts", "msg": "[DEBUG] 入口脚本开始执行", "data": {"path": "/"}, "ts": 1787197131625}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] 开始初始化 MSW", "data": {"useMock": true}, "ts": 1787197131626}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "A", "location": "src/main.ts", "msg": "[DEBUG] 入口脚本开始执行", "data": {"path": "/"}, "ts": 1787197211865}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] 开始初始化 MSW", "data": {"useMock": true}, "ts": 1787197211866}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "A", "location": "src/main.ts", "msg": "[DEBUG] 入口脚本开始执行", "data": {"path": "/"}, "ts": 1787197212081}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] 开始初始化 MSW", "data": {"useMock": true}, "ts": 1787197212082}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "A", "location": "src/main.ts", "msg": "[DEBUG] 入口脚本开始执行", "data": {"path": "/"}, "ts": 1787197314040}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] 开始初始化 MSW", "data": {"useMock": true}, "ts": 1787197314040}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "A", "location": "src/main.ts", "msg": "[DEBUG] 入口脚本开始执行", "data": {"path": "/"}, "ts": 1787197348706}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] 开始初始化 MSW", "data": {"useMock": true}, "ts": 1787197348706}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "A", "location": "src/main.ts", "msg": "[DEBUG] 入口脚本开始执行", "data": {"path": "/"}, "ts": 1787197348932}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] 开始初始化 MSW", "data": {"useMock": true}, "ts": 1787197348933}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] MSW 初始化完成", "data": {}, "ts": 1787197349024}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "B", "location": "src/main.ts", "msg": "[DEBUG] 准备挂载 Vue 应用", "data": {"appElement": true}, "ts": 1787197349035}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "B", "location": "src/main.ts", "msg": "[DEBUG] Vue 应用挂载完成", "data": {"htmlLength": 7}, "ts": 1787197349042}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/dashboard", "loggedIn": false}, "ts": 1787197349051}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/login", "loggedIn": false}, "ts": 1787197349054}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/dashboard", "loggedIn": true}, "ts": 1787197462635}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "A", "location": "src/main.ts", "msg": "[DEBUG] 入口脚本开始执行", "data": {"path": "/login"}, "ts": 1787197463651}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] 开始初始化 MSW", "data": {"useMock": true}, "ts": 1787197463652}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "C", "location": "src/main.ts", "msg": "[DEBUG] MSW 初始化完成", "data": {}, "ts": 1787197463711}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "B", "location": "src/main.ts", "msg": "[DEBUG] 准备挂载 Vue 应用", "data": {"appElement": true}, "ts": 1787197463714}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "B", "location": "src/main.ts", "msg": "[DEBUG] Vue 应用挂载完成", "data": {"htmlLength": 7}, "ts": 1787197463717}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/login", "loggedIn": true}, "ts": 1787197463718}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/dashboard", "loggedIn": true}, "ts": 1787197463719}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/users", "loggedIn": true}, "ts": 1787197481874}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/jobs", "loggedIn": true}, "ts": 1787197486607}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/contents", "loggedIn": true}, "ts": 1787197488902}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/orders", "loggedIn": true}, "ts": 1787197490340}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/system", "loggedIn": true}, "ts": 1787197492023}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/dashboard", "loggedIn": true}, "ts": 1787197497708}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/users", "loggedIn": true}, "ts": 1787197559931}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/dashboard", "loggedIn": true}, "ts": 1787197561162}
+{"sessionId": "blank-page-runtime", "runId": "pre", "hypothesisId": "D", "location": "src/router/index.ts", "msg": "[DEBUG] 路由守卫执行", "data": {"path": "/dashboard", "loggedIn": true}, "ts": 1787197567038}
