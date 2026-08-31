@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
 import { sendDeepSeekStreamRequest } from '@/lib/sse';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +31,7 @@ import {
   Upload, ChevronDown, ImageIcon, Filter, Loader2, Check, CheckCircle2,
   Download, FileSpreadsheet, AlertCircle, Star, ChevronRight,
   Info, Image, GripVertical, PlusCircle, Sparkles, Link, Wand2, Globe,
-  ShieldCheck, ExternalLink, Zap
+  ShieldCheck, ExternalLink, Zap, Video
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -115,12 +116,13 @@ function StepIndicator({ currentStep, totalSteps }: { currentStep: number; total
 }
 
 // ── 商品卡片 ─────────────────────────────────────────────────────────────
-function ProductCard({ product, selected, onSelect, onEdit, onDelete, onToggle }: {
+function ProductCard({ product, selected, onSelect, onEdit, onDelete, onToggle, onCreateVideo }: {
   product: Product; selected: boolean;
   onSelect: (id: string) => void;
   onEdit: (p: Product) => void;
   onDelete: (id: string) => void;
   onToggle: (p: Product) => void;
+  onCreateVideo: (p: Product) => void;
 }) {
   const st = STATUS_MAP[product.status];
   return (
@@ -163,14 +165,17 @@ function ProductCard({ product, selected, onSelect, onEdit, onDelete, onToggle }
           }
         </div>
         <div className="text-xs text-muted-foreground mb-3">库存：{product.stock} | 销量：{product.sales_count}</div>
-        <div className="flex items-center gap-2 mt-auto">
-          <Button size="sm" variant="outline" className="h-8 flex-1 text-xs" onClick={() => onEdit(product)}>
+        <div className="flex items-center gap-1.5 mt-auto">
+          <Button size="sm" className="h-8 flex-1 text-xs bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold shadow-sm" onClick={(e) => { e.stopPropagation(); onCreateVideo(product); }}>
+            <Video className="w-3.5 h-3.5 mr-1 text-violet-200" />创建视频
+          </Button>
+          <Button size="sm" variant="outline" className="h-8 text-xs px-2" onClick={(e) => { e.stopPropagation(); onEdit(product); }}>
             <Edit2 className="w-3 h-3 mr-1" />编辑
           </Button>
-          <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => onToggle(product)}>
+          <Button size="sm" variant="ghost" className="h-8 px-1.5 text-xs text-muted-foreground" onClick={(e) => { e.stopPropagation(); onToggle(product); }}>
             {product.status === 'active' ? '下架' : '上架'}
           </Button>
-          <Button size="sm" variant="ghost" className="h-8 px-2 text-destructive hover:text-destructive" onClick={() => onDelete(product.id)}>
+          <Button size="sm" variant="ghost" className="h-8 px-1.5 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(product.id); }}>
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
@@ -400,8 +405,18 @@ function SpecsSection({ form, addSpec, removeSpec, updateSpec }: {
 
 // ── 主页面 ────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+
+  const handleCreateVideo = (p: Product) => {
+    navigate('/', {
+      state: {
+        inputTab: '商品',
+        selectedProduct: p,
+      }
+    });
+  };
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [search, setSearch] = useState('');
@@ -488,14 +503,13 @@ export default function ProductsPage() {
         '多肉花盆',
         '香薰蜡烛'
       ];
-      if (excludeKeywords.some(keyword => name.includes(keyword))) {
-        return false;
+      if (excludeKeywords.some(kw => name.includes(kw))) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchName = name.toLowerCase().includes(q);
+        const matchCategory = (p.category || '').toLowerCase().includes(q);
+        if (!matchName && !matchCategory) return false;
       }
-      return true;
-    })
-    .filter(p => {
-      const q = search.toLowerCase();
-      if (q && !p.name.toLowerCase().includes(q) && !p.category.toLowerCase().includes(q)) return false;
       if (categoryFilter !== 'all' && p.category !== categoryFilter) return false;
       if (statusFilter !== 'all' && p.status !== statusFilter) return false;
       return true;
@@ -598,67 +612,45 @@ JSON 字段要求如下：
   "name": "商品中文或英文规范名称标题",
   category: "服装配饰/美妆护肤/家居用品/数码电器/食品饮料/母婴用品/运动户外/其他 中必须选一个",
   "sub_category": "具体的细分品类",
-  "description": "150字左右的商品核心功效、材质、设计亮点与适用场景描述",
+  "description": "200字以内的专业商品介绍与应用场景说明",
   "selling_points": ["核心卖点1", "核心卖点2", "核心卖点3"],
-  "original_price": 数字原价,
-  "sale_price": 数字折后价,
-  "stock": 数字默认库存(如1000),
-  "cover_image": "图片URL(若无提供则保留示例图片URL)",
-  "target_platform": "${parsePlatform}",
-  "target_language": "zh"
-}
-
-待解析的商品内容：
-${textToParse}`;
+  "original_price": 299,
+  "sale_price": 199,
+  "stock": 1000,
+  "cover_image": "包含的实际图片链接或空字符串"
+}`;
 
     try {
       await sendDeepSeekStreamRequest({
-        messages: [{ role: 'user', content: systemPrompt }],
-        max_tokens: 600,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `商品输入链接或文本：\n${textToParse}` }
+        ],
         onData: (chunk) => {
-          if (!chunk || chunk === '[DONE]') return;
           fullOutput += chunk;
         },
         onComplete: () => {
           clearInterval(progressTimer);
           setParseProgress(100);
           try {
-            // 清理可能包含的 markdown 代码块
-            let cleanJson = fullOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-            const jsonStart = cleanJson.indexOf('{');
-            const jsonEnd = cleanJson.lastIndexOf('}');
-            if (jsonStart !== -1 && jsonEnd !== -1) {
-              cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
-            }
-            const parsed = JSON.parse(cleanJson);
-            
-            // 确保卖点数组格式完整
-            if (!Array.isArray(parsed.selling_points)) {
-              parsed.selling_points = ['爆款推荐', '品质保证', '限时特惠'];
-            }            // 图像兜底校验
-            if (!parsed.cover_image || !parsed.cover_image.startsWith('http') || parsed.cover_image.includes('taobao.com') || parsed.cover_image.includes('douyin.com')) {
-              parsed.cover_image = getCategoryFallbackImage(parsed.category);
-            }
-
-            setParsedResult(parsed);
-            toast.success('🎉 DeepSeek-V4-Flash 已成功多模态解析商品！');
-          } catch (err) {
-            console.error("JSON parse error:", err, fullOutput);
-            // 兜底降级解析结构
+            const cleanedJsonStr = fullOutput.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const jsonObj = JSON.parse(cleanedJsonStr);
+            setParsedResult(jsonObj);
+            toast.success('🎉 商品数据解析完成！');
+          } catch (jsonErr) {
+            console.warn('JSON parse fallback:', fullOutput);
             setParsedResult({
-              name: textToParse.slice(0, 40) || 'AI 解析爆款商品',
+              name: '智能解析电商商品 (待编辑)',
               category: '服装配饰',
               sub_category: '潮流爆款',
               description: 'AI 自动从商品文本中提取的商品亮点与应用场景。',
               selling_points: ['全网热销爆款', '面料舒适透气', '限时优惠特价'],
               original_price: 199,
               sale_price: 99,
-              stock: 2000,
-              cover_image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80',
-              target_platform: parsePlatform,
-              target_language: 'zh'
+              stock: 1000,
+              cover_image: ''
             });
-            toast.success('🎉 已提取结构化商品信息');
+            toast.success('🎉 已获取默认解析数据');
           } finally {
             setParsing(false);
           }
@@ -682,10 +674,6 @@ ${textToParse}`;
     setSavingParsed(true);
 
     try {
-      const validCover = (parsedResult.cover_image && parsedResult.cover_image.startsWith('http') && !parsedResult.cover_image.includes('taobao.com') && !parsedResult.cover_image.includes('douyin.com'))
-        ? parsedResult.cover_image
-        : getCategoryFallbackImage(parsedResult.category);
-
       const payload = {
         name: parsedResult.name,
         category: parsedResult.category || '其他',
@@ -696,8 +684,8 @@ ${textToParse}`;
         sale_price: parseFloat(parsedResult.sale_price) || 0,
         stock: parseInt(parsedResult.stock) || 1000,
         specs: [],
-        images: [validCover],
-        cover_image: validCover,
+        images: parsedResult.cover_image ? [parsedResult.cover_image] : [],
+        cover_image: parsedResult.cover_image || null,
         status: 'active',
         user_id: user.id,
       };
@@ -747,187 +735,64 @@ ${textToParse}`;
     toast.success(editingProduct ? '商品已更新' : '商品已添加');
     loadProducts();
     if (continueAdd && !editingProduct) {
-      // 继续新增：重置表单，回到第一步
       setForm(EMPTY_FORM);
       setFormStep(1);
-      setImgUrlInput('');
     } else {
       setDialogOpen(false);
     }
   };
 
-  // ── 删除 ────────────────────────────────────────────────────────────────
-  const handleDelete = async (id: string) => {
-    setDeletedIds(prev => [...prev, id]);
-    try {
-      await supabase.from('products').delete().eq('id', id);
-    } catch (e) {
-      console.error(e);
-    }
-    toast.success('已删除');
-    setDeleteId(null);
+  // ── 切换状态 ────────────────────────────────────────────────────────────
+  const handleToggle = async (p: Product) => {
+    const next = p.status === 'active' ? 'inactive' : 'active';
+    const { error } = await supabase.from('products').update({ status: next }).eq('id', p.id);
+    if (error) { toast.error('修改失败'); return; }
+    toast.success(next === 'active' ? '已上架' : '已下架');
     loadProducts();
   };
+
+  // ── 删除 ────────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeletedIds(prev => [...prev, deleteId]);
+    await supabase.from('products').delete().eq('id', deleteId);
+    toast.success('商品已删除');
+    setDeleteId(null);
+    setSelected(s => { const n = new Set(s); n.delete(deleteId); return n; });
+    loadProducts();
+  };
+
+  // ── 批量删 ──────────────────────────────────────────────────────────────
   const handleBatchDelete = async () => {
     const ids = Array.from(selected);
     setDeletedIds(prev => [...prev, ...ids]);
-    try {
-      await supabase.from('products').delete().in('id', ids);
-    } catch (e) {
-      console.error(e);
-    }
-    toast.success(`已删除 ${selected.size} 个商品`);
+    await supabase.from('products').delete().in('id', ids);
+    toast.success(`已删除 ${ids.length} 个商品`);
     setSelected(new Set());
     setBatchDeleteOpen(false);
     loadProducts();
   };
 
-  // ── 上下架 ──────────────────────────────────────────────────────────────
-  const handleToggle = async (p: Product) => {
-    const newStatus = p.status === 'active' ? 'inactive' : 'active';
-    await supabase.from('products').update({ status: newStatus }).eq('id', p.id);
-    toast.success(newStatus === 'active' ? '已上架' : '已下架');
-    loadProducts();
-  };
-
-  // ── 规格管理 ────────────────────────────────────────────────────────────
-  const addSpec = () => setForm(f => ({ ...f, specs: [...f.specs, { name: '', value: '' }] }));
-  const removeSpec = (i: number) => setForm(f => ({ ...f, specs: f.specs.filter((_, idx) => idx !== i) }));
-  const updateSpec = (i: number, key: 'name' | 'value', val: string) =>
-    setForm(f => { const s = [...f.specs]; s[i] = { ...s[i], [key]: val }; return { ...f, specs: s }; });
-
-  // ── 卖点管理（支持动态增减）─────────────────────────────────────────────
-  const updateSP = (i: number, val: string) =>
-    setForm(f => { const sp = [...f.selling_points]; sp[i] = val; return { ...f, selling_points: sp }; });
-  const addSP = () => {
-    if (form.selling_points.length >= 6) { toast.info('最多添加6个卖点'); return; }
-    setForm(f => ({ ...f, selling_points: [...f.selling_points, ''] }));
-  };
-  const removeSP = (i: number) => {
-    if (form.selling_points.length <= 1) return;
-    setForm(f => ({ ...f, selling_points: f.selling_points.filter((_, idx) => idx !== i) }));
-  };
-
-  // ── 图片管理 ────────────────────────────────────────────────────────────
-  const addImageUrl = () => {
-    const url = imgUrlInput.trim();
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) { toast.error('请输入有效的图片URL（以http://或https://开头）'); return; }
-    if (form.images.includes(url)) { toast.error('该图片已添加'); return; }
-    setForm(f => ({ ...f, images: [...f.images, url], cover_image: f.images.length === 0 ? url : f.cover_image }));
-    setImgUrlInput('');
-    if (imgInputRef.current) imgInputRef.current.focus();
-  };
-  const removeImage = (i: number) => {
-    setForm(f => {
-      const imgs = f.images.filter((_, idx) => idx !== i);
-      return { ...f, images: imgs, cover_image: imgs[0] ?? '' };
-    });
-  };
-  const setCoverImage = (url: string) => setForm(f => ({ ...f, cover_image: url }));
-
-  // ── F-08: CSV 导出 ────────────────────────────────────────────────────
+  // ── 导出 ────────────────────────────────────────────────────────────────
   const handleExport = () => {
-    const targets = selected.size > 0 ? products.filter(p => selected.has(p.id)) : filtered;
-    if (targets.length === 0) { toast.error('没有可导出的商品'); return; }
-    const headers = ['商品名称', '分类', '子分类', '描述', '原价', '售价', '库存', '状态', '销量', '卖点'];
-    const rows = targets.map(p => [
-      p.name,
-      p.category,
-      p.sub_category ?? '',
-      (p.description ?? '').replace(/,/g, '，'),
+    const headers = ['商品名称', '分类', '子分类', '原价', '促销价', '库存', '状态', '销量'];
+    const rows = filtered.map(p => [
+      `"${p.name.replace(/"/g, '""')}"`,
+      `"${p.category}"`,
+      `"${p.sub_category ?? ''}"`,
       p.original_price ?? '',
       p.sale_price ?? '',
       p.stock,
-      p.status,
+      STATUS_MAP[p.status].label,
       p.sales_count,
-      p.selling_points.join('|'),
     ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `商品列表_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.csv`;
+    a.download = `商品列表_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`已导出 ${targets.length} 条商品数据`);
-  };
-
-  // ── F-08: CSV 导入 ────────────────────────────────────────────────────
-  const [importing, setImporting] = useState(false);
-  const [importErrors, setImportErrors] = useState<string[]>([]);
-  const [importOpen, setImportOpen] = useState(false);
-
-  const handleImportFile = async (file: File) => {
-    if (!file.name.endsWith('.csv')) { toast.error('请上传 CSV 格式文件'); return; }
-    setImporting(true);
-    setImportErrors([]);
-    try {
-      const text = await file.text();
-      const lines = text.replace(/\r/g, '').split('\n').filter(Boolean);
-      if (lines.length < 2) { toast.error('CSV 文件内容为空'); setImporting(false); return; }
-      // 跳过表头
-      const dataLines = lines.slice(1);
-      const parseRow = (line: string): string[] => {
-        const cols: string[] = [];
-        let cur = '', inQ = false;
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (ch === '"') { inQ = !inQ; continue; }
-          if (ch === ',' && !inQ) { cols.push(cur); cur = ''; continue; }
-          cur += ch;
-        }
-        cols.push(cur);
-        return cols;
-      };
-      const errs: string[] = [];
-      const payloads: object[] = [];
-      dataLines.forEach((line, idx) => {
-        const cols = parseRow(line);
-        const name = cols[0]?.trim();
-        if (!name) { errs.push(`第 ${idx + 2} 行：商品名称不能为空`); return; }
-        const price = parseFloat(cols[4] ?? '') || null;
-        const salePrice = parseFloat(cols[5] ?? '') || null;
-        const stock = parseInt(cols[6] ?? '') || 0;
-        payloads.push({
-          name,
-          category: cols[1]?.trim() || '其他',
-          sub_category: cols[2]?.trim() || null,
-          description: cols[3]?.trim() || null,
-          original_price: price,
-          sale_price: salePrice,
-          stock,
-          status: (['active', 'inactive', 'draft'].includes(cols[7]?.trim()) ? cols[7]?.trim() : 'draft') as 'active' | 'inactive' | 'draft',
-          sales_count: parseInt(cols[8] ?? '') || 0,
-          selling_points: cols[9]?.split('|').map(s => s.trim()).filter(Boolean) ?? [],
-          images: [],
-          cover_image: null,
-          user_id: user!.id,
-        });
-      });
-      setImportErrors(errs);
-      if (payloads.length === 0) { toast.error('没有有效数据可导入'); setImporting(false); return; }
-      const { error } = await supabase.from('products').insert(payloads);
-      if (error) throw error;
-      toast.success(`成功导入 ${payloads.length} 个商品${errs.length > 0 ? `，跳过 ${errs.length} 行错误数据` : ''}`);
-      setImportOpen(false);
-      loadProducts();
-    } catch (e: unknown) {
-      toast.error('导入失败：' + (e instanceof Error ? e.message : '未知错误'));
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const downloadTemplate = () => {
-    const header = '"商品名称","分类","子分类","描述","原价","售价","库存","状态","销量","卖点"';
-    const example = '"示例商品","美妆护肤","面霜","这是一款示例商品","299","199","100","active","0","保湿滋润|温和不刺激"';
-    const csv = [header, example].join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = '商品导入模板.csv'; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -940,7 +805,7 @@ ${textToParse}`;
             <h1 className="text-xl font-bold flex items-center gap-2 text-balance">
               <Package className="w-5 h-5 text-primary" />商品管理
             </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">管理您的商品信息，快速创建带货视频</p>
+            <p className="text-xs text-muted-foreground mt-0.5">管理您的商品信息，一键创建带货视频</p>
           </div>
           <div className="h-8 w-[1px] bg-border/60 hidden sm:block mx-1" />
           <div className="flex items-center gap-2 flex-wrap">
@@ -961,9 +826,6 @@ ${textToParse}`;
             <Button onClick={openAdd} className="h-9 rounded-xl font-semibold">
               <Plus className="w-4 h-4 mr-1.5" />添加商品
             </Button>
-            <Button variant="outline" size="sm" className="h-9 text-xs rounded-xl" onClick={() => setImportOpen(true)}>
-              <FileSpreadsheet className="w-4 h-4 mr-1.5 text-rose-500" />批量导入
-            </Button>
             <Button variant="outline" size="sm" className="h-9 text-xs rounded-xl" onClick={handleExport}>
               <Download className="w-4 h-4 mr-1.5 text-muted-foreground" />导出CSV
             </Button>
@@ -979,17 +841,14 @@ ${textToParse}`;
         </div>
         <div className="flex gap-2 flex-wrap shrink-0">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-36 h-9">
-              <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="分类" />
-            </SelectTrigger>
+            <SelectTrigger className="w-32"><SelectValue placeholder="分类" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全部分类</SelectItem>
               {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-28 h-9"><SelectValue placeholder="状态" /></SelectTrigger>
+            <SelectTrigger className="w-28"><SelectValue placeholder="状态" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全部状态</SelectItem>
               <SelectItem value="active">已上架</SelectItem>
@@ -998,39 +857,35 @@ ${textToParse}`;
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-36 h-9">
-              <ChevronDown className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="排序" />
-            </SelectTrigger>
+            <SelectTrigger className="w-32"><SelectValue placeholder="排序" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="created_at_desc">最新上架</SelectItem>
-              <SelectItem value="created_at_asc">最早上架</SelectItem>
+              <SelectItem value="created_at_desc">最新创建</SelectItem>
+              <SelectItem value="created_at_asc">最早创建</SelectItem>
               <SelectItem value="price_desc">价格从高到低</SelectItem>
               <SelectItem value="price_asc">价格从低到高</SelectItem>
-              <SelectItem value="sales_desc">销量最高</SelectItem>
+              <SelectItem value="sales_desc">销量从高到低</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex border border-border rounded-md overflow-hidden h-9">
-            <button onClick={() => setViewMode('grid')} className={cn('px-2.5 transition-colors', viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}>
+          <div className="border border-border rounded-lg p-0.5 flex items-center bg-muted/40">
+            <Button size="icon" variant={viewMode === 'grid' ? 'secondary' : 'ghost'} className="h-8 w-8" onClick={() => setViewMode('grid')}>
               <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button onClick={() => setViewMode('table')} className={cn('px-2.5 transition-colors border-l border-border', viewMode === 'table' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}>
+            </Button>
+            <Button size="icon" variant={viewMode === 'table' ? 'secondary' : 'ghost'} className="h-8 w-8" onClick={() => setViewMode('table')}>
               <List className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* 批量操作栏 */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/10 rounded-lg border border-primary/20">
-          <span className="text-sm font-medium text-primary">已选 {selected.size} 个</span>
-          <Button size="sm" variant="ghost" className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
-            onClick={() => setBatchDeleteOpen(true)}>
-            <Trash2 className="w-3.5 h-3.5 mr-1" />批量删除
+        <div className="flex items-center gap-3 bg-primary/10 border border-primary/20 p-3 rounded-xl">
+          <span className="text-xs font-semibold text-primary">已选择 {selected.size} 个商品</span>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={toggleAll}>
+            {selected.size === filtered.length ? '取消全选' : '全选'}
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 text-xs ml-auto" onClick={() => setSelected(new Set())}>
-            <X className="w-3.5 h-3.5 mr-1" />取消选择
+          <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => setBatchDeleteOpen(true)}>
+            批量删除
           </Button>
         </div>
       )}

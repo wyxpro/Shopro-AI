@@ -351,47 +351,7 @@ export default function HomePage() {
     location.state?.selectedAvatar ?? null
   );
 
-  useEffect(() => {
-    if (location.state?.selectedAvatar) {
-      setSelectedAvatar(location.state.selectedAvatar);
-      setInputTab(location.state?.inputTab || '数字人');
-    }
-  }, [location.state]);
-
-  const [prompt, setPrompt] = useState('');
-
-  // ── 新增商品选择弹窗及提取提示词相关状态 ──────────────────────────
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  const [productsList, setProductsList] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [productSearch, setProductSearch] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('全部');
-
-  const loadProductsForSelector = useCallback(async () => {
-    setLoadingProducts(true);
-    try {
-      const DEMO_UID = '7d58d08f-8aa3-43f5-a30f-b7495d59d147';
-      let query = supabase.from('products').select('*');
-      if (user?.id) {
-        query = query.or(`user_id.eq.${user.id},user_id.eq.${DEMO_UID}`);
-      }
-      const { data } = await query.order('created_at', { ascending: false });
-
-      if (data && data.length > 0) {
-        setProductsList(data as Product[]);
-      } else {
-        setProductsList(MOCK_SELECTOR_PRODUCTS);
-      }
-    } catch (err) {
-      console.error('Failed to fetch products for selector:', err);
-      setProductsList(MOCK_SELECTOR_PRODUCTS);
-    } finally {
-      setLoadingProducts(false);
-    }
-  }, [user]);
-
-  const handleSelectProduct = (prod: Product) => {
+  const handleSelectProduct = useCallback((prod: Product) => {
     setSelectedProduct(prod);
     setIsProductModalOpen(false);
 
@@ -418,8 +378,28 @@ export default function HomePage() {
 
     toast.success(`已成功选择商品「${prod.name}」，关键卖点与描述信息已自动生成并填充至提示词脚本！`, {
       duration: 4000,
+      style: {
+        background: '#1c1929',
+        color: '#ffffff',
+        border: '1.5px solid #10b981',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7)',
+        borderRadius: '14px',
+        padding: '12px 16px',
+        fontSize: '13px',
+        fontWeight: '600',
+      },
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    if (location.state?.selectedProduct) {
+      handleSelectProduct(location.state.selectedProduct);
+      setInputTab('商品');
+    } else if (location.state?.selectedAvatar) {
+      setSelectedAvatar(location.state.selectedAvatar);
+      setInputTab(location.state?.inputTab || '数字人');
+    }
+  }, [location.state, handleSelectProduct]);
 
   const filteredSelectorProducts = productsList.filter(prod => {
     if (selectedCategoryFilter !== '全部' && prod.category !== selectedCategoryFilter) return false;
@@ -2504,7 +2484,7 @@ export default function HomePage() {
                                   : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white border border-violet-400/30'
                               )}
                             >
-                              {isSelected ? <Check className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
+                              {isSelected ? <Check className="w-3.5 h-3.5" /> : <Wand2 className="w-3.5 h-3.5" />}
                               {isSelected ? '已选此商品' : '提取视频脚本'}
                             </button>
                           </div>
