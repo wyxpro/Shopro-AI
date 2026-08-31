@@ -410,7 +410,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
 
   const handleCreateVideo = (p: Product) => {
-    navigate('/', {
+    navigate('/video/create', {
       state: {
         inputTab: '商品',
         selectedProduct: p,

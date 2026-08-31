@@ -2,7 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+
+function RedirectWithState({ to }: { to: string }) {
+  const location = useLocation();
+  return <Navigate to={to} state={location.state} replace />;
+}
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import MainLayout from "@/components/layouts/MainLayout";
 import { lazy, Suspense, Component, type ReactNode } from "react";
@@ -133,8 +138,8 @@ function AppRoutes() {
             <ErrorBoundary>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  <Route path="/home" element={<Navigate to="/video/create" replace />} />
-                  <Route path="/" element={<Navigate to="/video/create" replace />} />
+                  <Route path="/home" element={<RedirectWithState to="/video/create" />} />
+                  <Route path="/" element={<RedirectWithState to="/video/create" />} />
                   <Route path="/video/create" element={<HomePage />} />
                   <Route path="/video/create/:projectId" element={<HomePage />} />
                   <Route path="/works" element={<WorksPage />} />
