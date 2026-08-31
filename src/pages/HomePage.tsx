@@ -1251,7 +1251,7 @@ export default function HomePage() {
                         inputTab === t ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70')}
                     >
                       {t === '参考' && <ImageIcon className="w-3.5 h-3.5" />}
-                      {t === '商品' && <Package className="w-3.5 h-3.5 text-amber-400" />}
+                      {t === '商品' && <Package className="w-3.5 h-3.5 text-violet-400" />}
                       {t === '首尾帧' && <Copy className="w-3.5 h-3.5" />}
                       {t === '数字人' && <Users2 className="w-3.5 h-3.5 text-primary" />}
                       {t === '编辑' && <Wand2 className="w-3.5 h-3.5" />}
@@ -1379,23 +1379,23 @@ export default function HomePage() {
                     ) : inputTab === '商品' ? (
                       <div className="flex items-center gap-1.5 shrink-0 mr-1 select-none">
                         {selectedProduct ? (
-                          <div className="flex items-center gap-2 bg-amber-950/40 border border-amber-500/40 rounded-xl px-2.5 py-1.5 text-xs text-white relative shadow-md">
+                          <div className="flex items-center gap-2 bg-violet-950/60 border border-violet-500/40 rounded-xl px-2.5 py-1.5 text-xs text-white relative shadow-md">
                             <img
                               src={selectedProduct.cover_image || getCategoryFallbackImage(selectedProduct.category)}
                               alt={selectedProduct.name}
-                              className="w-10 h-10 rounded-lg object-cover border border-amber-400/40 shrink-0"
+                              className="w-10 h-10 rounded-lg object-cover border border-violet-400/40 shrink-0"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = getCategoryFallbackImage(selectedProduct.category);
                               }}
                             />
                             <div className="flex flex-col min-w-0 max-w-[160px]">
-                              <span className="font-bold text-amber-200 text-xs truncate" title={selectedProduct.name}>
+                              <span className="font-bold text-white text-xs truncate" title={selectedProduct.name}>
                                 {selectedProduct.name}
                               </span>
-                              <div className="flex items-center gap-1.5 text-[10px] text-amber-300/80">
-                                <span className="bg-amber-500/20 px-1 rounded">{selectedProduct.category}</span>
+                              <div className="flex items-center gap-1.5 text-[10px] text-zinc-300">
+                                <span className="bg-violet-500/20 text-violet-300 px-1 rounded">{selectedProduct.category}</span>
                                 {(selectedProduct.sale_price ?? selectedProduct.original_price) && (
-                                  <span className="font-semibold text-amber-400">¥{selectedProduct.sale_price ?? selectedProduct.original_price}</span>
+                                  <span className="font-bold text-rose-400">¥{selectedProduct.sale_price ?? selectedProduct.original_price}</span>
                                 )}
                               </div>
                             </div>
@@ -1405,7 +1405,7 @@ export default function HomePage() {
                                 setIsProductModalOpen(true);
                                 loadProductsForSelector();
                               }}
-                              className="text-[10px] text-amber-300 underline hover:text-amber-100 ml-1"
+                              className="text-[10px] text-violet-300 underline hover:text-white ml-1 font-medium"
                             >
                               更换
                             </button>
@@ -1425,11 +1425,11 @@ export default function HomePage() {
                               setIsProductModalOpen(true);
                               loadProductsForSelector();
                             }}
-                            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:border-amber-400/60 hover:bg-amber-500/25 transition-all text-xs font-semibold text-amber-200 shadow-sm group"
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-600/20 border border-violet-500/30 hover:border-violet-400/60 hover:bg-violet-600/30 transition-all text-xs font-semibold text-violet-200 shadow-sm group"
                           >
-                            <ShoppingBag className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                            <ShoppingBag className="w-4 h-4 text-violet-400 group-hover:scale-110 transition-transform" />
                             <span>选择商品管理中的商品</span>
-                            <ChevronRight className="w-3.5 h-3.5 text-amber-400/70" />
+                            <ChevronRight className="w-3.5 h-3.5 text-violet-400/70" />
                           </button>
                         )}
                       </div>
@@ -2326,19 +2326,19 @@ export default function HomePage() {
         <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
           <DialogContent className="max-w-3xl max-h-[85vh] bg-[#16151f] border-white/10 text-white p-0 overflow-hidden flex flex-col rounded-2xl shadow-2xl">
             {/* 弹窗头部 */}
-            <DialogHeader className="p-5 border-b border-white/10 bg-gradient-to-r from-amber-950/50 via-purple-950/40 to-[#16151f] flex flex-row items-center justify-between space-y-0">
+            <DialogHeader className="p-5 border-b border-white/10 bg-gradient-to-r from-violet-950/60 via-purple-950/40 to-[#16151f] flex flex-row items-center justify-between space-y-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 border border-violet-500/30 flex items-center justify-center text-violet-400 shrink-0 shadow-inner">
                   <ShoppingBag className="w-5 h-5" />
                 </div>
                 <div>
                   <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
                     选择商品管理中的商品
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-normal border border-amber-500/30">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-medium border border-violet-500/30">
                       {filteredSelectorProducts.length} 款可选用
                     </span>
                   </DialogTitle>
-                  <p className="text-xs text-white/50 mt-0.5">
+                  <p className="text-xs text-zinc-400 mt-0.5">
                     选择商品后将自动提取标题、活动价格、核心卖点与详细描述，一键转换填充为带货脚本提示词
                   </p>
                 </div>
@@ -2356,19 +2356,19 @@ export default function HomePage() {
             <div className="p-4 border-b border-white/10 bg-white/[0.02] space-y-3">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="搜索商品名称、核心卖点、品牌或分类..."
                     value={productSearch}
                     onChange={e => setProductSearch(e.target.value)}
-                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/60"
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500/60"
                   />
                   {productSearch && (
                     <button
                       type="button"
                       onClick={() => setProductSearch('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -2380,7 +2380,7 @@ export default function HomePage() {
                     setIsProductModalOpen(false);
                     navigate('/products');
                   }}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-semibold text-amber-300 hover:text-amber-200 transition-colors shrink-0"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-zinc-200 hover:text-white transition-colors shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   管理已有商品
@@ -2395,10 +2395,10 @@ export default function HomePage() {
                     type="button"
                     onClick={() => setSelectedCategoryFilter(cat)}
                     className={cn(
-                      'px-3 py-1 rounded-lg text-xs font-medium transition-all shrink-0 border',
+                      'px-3.5 py-1.5 rounded-xl text-xs transition-all shrink-0 border',
                       selectedCategoryFilter === cat
-                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm'
-                        : 'bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                        ? 'bg-violet-600 border-violet-500 text-white font-semibold shadow-md'
+                        : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 font-medium'
                     )}
                   >
                     {cat}
@@ -2410,13 +2410,13 @@ export default function HomePage() {
             {/* 商品列表 */}
             <div className="flex-1 overflow-y-auto p-4 max-h-[460px] space-y-3">
               {loadingProducts ? (
-                <div className="py-16 text-center text-white/50 space-y-2">
-                  <Loader2 className="w-7 h-7 animate-spin text-amber-400 mx-auto" />
+                <div className="py-16 text-center text-zinc-400 space-y-2">
+                  <Loader2 className="w-7 h-7 animate-spin text-violet-400 mx-auto" />
                   <p className="text-xs">正在加载商品管理库中的数据...</p>
                 </div>
               ) : filteredSelectorProducts.length === 0 ? (
-                <div className="py-16 text-center text-white/50 space-y-3">
-                  <Package className="w-10 h-10 text-white/20 mx-auto" />
+                <div className="py-16 text-center text-zinc-400 space-y-3">
+                  <Package className="w-10 h-10 text-zinc-600 mx-auto" />
                   <p className="text-sm">未搜索到相关商品</p>
                   <button
                     type="button"
@@ -2424,7 +2424,7 @@ export default function HomePage() {
                       setIsProductModalOpen(false);
                       navigate('/products');
                     }}
-                    className="px-4 py-2 rounded-xl bg-amber-500 text-black font-semibold text-xs hover:bg-amber-400 transition-colors inline-flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-violet-600 text-white font-semibold text-xs hover:bg-violet-500 transition-colors inline-flex items-center gap-1.5 shadow-md"
                   >
                     <Plus className="w-4 h-4" />
                     前往「商品管理」添加商品
@@ -2442,14 +2442,14 @@ export default function HomePage() {
                         key={prod.id}
                         onClick={() => handleSelectProduct(prod)}
                         className={cn(
-                          'p-3 rounded-xl border transition-all cursor-pointer flex gap-3 group relative overflow-hidden',
+                          'p-3.5 rounded-xl border transition-all cursor-pointer flex gap-3 group relative overflow-hidden shadow-sm',
                           isSelected
-                            ? 'bg-amber-500/15 border-amber-500/60 ring-1 ring-amber-500/40 shadow-lg'
-                            : 'bg-white/5 border-white/10 hover:border-amber-500/40 hover:bg-white/[0.08]'
+                            ? 'bg-emerald-950/20 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-lg'
+                            : 'bg-[#1a1829] border-zinc-800 hover:border-violet-500/40 hover:bg-[#211e35]'
                         )}
                       >
                         {/* 封面图 */}
-                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-black/40 shrink-0 border border-white/10 relative">
+                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10 relative">
                           <img
                             src={prod.cover_image || getCategoryFallbackImage(prod.category)}
                             alt={prod.name}
@@ -2458,7 +2458,7 @@ export default function HomePage() {
                               (e.target as HTMLImageElement).src = getCategoryFallbackImage(prod.category);
                             }}
                           />
-                          <span className="absolute bottom-1 left-1 text-[9px] px-1 py-0.2 rounded bg-black/70 text-white/80 font-medium">
+                          <span className="absolute bottom-1 left-1 text-[9px] px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-zinc-300 border border-white/15 font-medium">
                             {prod.category}
                           </span>
                         </div>
@@ -2466,14 +2466,14 @@ export default function HomePage() {
                         {/* 描述信息 */}
                         <div className="flex-1 min-w-0 flex flex-col justify-between">
                           <div>
-                            <h4 className="text-sm font-semibold text-white group-hover:text-amber-300 transition-colors line-clamp-1">
+                            <h4 className="text-sm font-bold text-zinc-100 group-hover:text-white transition-colors line-clamp-1">
                               {prod.name}
                             </h4>
                             {price && (
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-sm font-bold text-amber-400">¥{price}</span>
+                              <div className="flex items-baseline gap-1.5 mt-0.5">
+                                <span className="text-base font-extrabold text-rose-400">¥{price}</span>
                                 {prod.original_price && prod.sale_price && prod.original_price > prod.sale_price && (
-                                  <span className="text-[10px] text-white/40 line-through">¥{prod.original_price}</span>
+                                  <span className="text-xs text-zinc-500 line-through">¥{prod.original_price}</span>
                                 )}
                               </div>
                             )}
@@ -2482,7 +2482,7 @@ export default function HomePage() {
                                 {points.slice(0, 2).map((pt, idx) => (
                                   <span
                                     key={idx}
-                                    className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-200/90 border border-amber-500/20 max-w-[130px] truncate"
+                                    className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 font-medium max-w-[135px] truncate"
                                   >
                                     ⚡ {pt}
                                   </span>
@@ -2492,19 +2492,19 @@ export default function HomePage() {
                           </div>
 
                           <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
-                            <span className="text-[10px] text-white/40">
+                            <span className="text-[11px] text-zinc-400">
                               月销: {prod.sales_count || 0}
                             </span>
                             <button
                               type="button"
                               className={cn(
-                                'text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1',
+                                'text-xs font-semibold px-3 py-1 rounded-xl transition-all flex items-center gap-1.5 shadow-sm',
                                 isSelected
-                                  ? 'bg-amber-500 text-black'
-                                  : 'bg-amber-500/20 text-amber-300 group-hover:bg-amber-500 group-hover:text-black'
+                                  ? 'bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-md'
+                                  : 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white border border-violet-400/30'
                               )}
                             >
-                              {isSelected ? <Check className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+                              {isSelected ? <Check className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
                               {isSelected ? '已选此商品' : '提取视频脚本'}
                             </button>
                           </div>
