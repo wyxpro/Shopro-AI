@@ -622,7 +622,7 @@ function PromoVideoPlayer() {
 
               {!isPlaying && (
                 <div className="mt-4 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-semibold text-white tracking-wide shadow-lg animate-bounce">
-                  ✨ 点击播放 3 分钟实操带货视频演示 (1080P)
+                  ✨ 点击播放1分钟实操带货视频演示
                 </div>
               )}
             </div>
@@ -896,7 +896,7 @@ export default function LandingPage() {
       ══════════════════════════════════════════════════════ */}
       <section id="功能" className="py-24 landing-section-dark">
         <div className="max-w-6xl mx-auto px-4 md:px-8">
-          
+
           {/* 宣传视频播放组件 */}
           <PromoVideoPlayer />
 

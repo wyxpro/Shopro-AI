@@ -1034,7 +1034,8 @@ JSON 字段要求如下：
             {filtered.map(p => (
               <ProductCard key={p.id} product={p} selected={selected.has(p.id)}
                 onSelect={toggleSelect} onEdit={openEdit}
-                onDelete={id => setDeleteId(id)} onToggle={handleToggle} />
+                onDelete={id => setDeleteId(id)} onToggle={handleToggle}
+                onCreateVideo={handleCreateVideo} />
             ))}
           </div>
         </div>
@@ -1079,14 +1080,17 @@ JSON 字段要求如下：
                         <span className={cn('text-xs px-2 py-0.5 rounded-full border', st.cls)}>{st.label}</span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(p)}>
+                        <div className="flex items-center gap-1.5">
+                          <Button size="sm" className="h-8 text-xs bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold shadow-sm" onClick={(e) => { e.stopPropagation(); handleCreateVideo(p); }}>
+                            <Video className="w-3.5 h-3.5 mr-1 text-violet-200" />创建视频
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEdit(p); }}>
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" className="h-8 text-xs px-2" onClick={() => handleToggle(p)}>
+                          <Button size="sm" variant="ghost" className="h-8 text-xs px-2" onClick={(e) => { e.stopPropagation(); handleToggle(p); }}>
                             {p.status === 'active' ? '下架' : '上架'}
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(p.id)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteId(p.id); }}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
