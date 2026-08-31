@@ -776,6 +776,42 @@ JSON 字段要求如下：
     loadProducts();
   };
 
+  // ── 规格管理 ────────────────────────────────────────────────────────────
+  const addSpec = () => setForm(f => ({ ...f, specs: [...f.specs, { name: '', value: '' }] }));
+  const removeSpec = (i: number) => setForm(f => ({ ...f, specs: f.specs.filter((_, idx) => idx !== i) }));
+  const updateSpec = (i: number, key: 'name' | 'value', val: string) =>
+    setForm(f => { const s = [...f.specs]; s[i] = { ...s[i], [key]: val }; return { ...f, specs: s }; });
+
+  // ── 卖点管理（支持动态增减）─────────────────────────────────────────────
+  const updateSP = (i: number, val: string) =>
+    setForm(f => { const sp = [...f.selling_points]; sp[i] = val; return { ...f, selling_points: sp }; });
+  const addSP = () => {
+    if (form.selling_points.length >= 6) { toast.info('最多添加6个卖点'); return; }
+    setForm(f => ({ ...f, selling_points: [...f.selling_points, ''] }));
+  };
+  const removeSP = (i: number) => {
+    if (form.selling_points.length <= 1) return;
+    setForm(f => ({ ...f, selling_points: f.selling_points.filter((_, idx) => idx !== i) }));
+  };
+
+  // ── 图片管理 ────────────────────────────────────────────────────────────
+  const addImageUrl = () => {
+    const url = imgUrlInput.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) { toast.error('请输入有效的图片URL（以http://或https://开头）'); return; }
+    if (form.images.includes(url)) { toast.error('该图片已添加'); return; }
+    setForm(f => ({ ...f, images: [...f.images, url], cover_image: f.images.length === 0 ? url : f.cover_image }));
+    setImgUrlInput('');
+    if (imgInputRef.current) imgInputRef.current.focus();
+  };
+  const removeImage = (i: number) => {
+    setForm(f => {
+      const imgs = f.images.filter((_, idx) => idx !== i);
+      return { ...f, images: imgs, cover_image: imgs[0] ?? '' };
+    });
+  };
+  const setCoverImage = (url: string) => setForm(f => ({ ...f, cover_image: url }));
+
   // ── 导出 ────────────────────────────────────────────────────────────────
   const handleExport = () => {
     const headers = ['商品名称', '分类', '子分类', '原价', '促销价', '库存', '状态', '销量'];

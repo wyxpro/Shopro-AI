@@ -426,9 +426,14 @@ export default function HomePage() {
 
   useEffect(() => {
     if (location.state?.selectedProduct) {
+      setMainTab('视频生成');
+      setInputTab('商品');
       handleSelectProduct(location.state.selectedProduct);
+    } else if (location.state?.inputTab === '商品') {
+      setMainTab('视频生成');
       setInputTab('商品');
     } else if (location.state?.selectedAvatar) {
+      setMainTab('视频生成');
       setSelectedAvatar(location.state.selectedAvatar);
       setInputTab(location.state?.inputTab || '数字人');
     }
@@ -1476,7 +1481,19 @@ export default function HomePage() {
                                 type="button"
                                 onClick={() => {
                                   setSelectedAvatar(avatar);
-                                  toast.success(`已选择数字人「${avatar.name}」！`);
+                                  toast.success(`已成功选择数字人「${avatar.name}」，形象与发音人已同步载入！`, {
+                                    duration: 4000,
+                                    style: {
+                                      background: '#161324',
+                                      color: '#ffffff',
+                                      border: '1.5px solid #8b5cf6',
+                                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.8)',
+                                      borderRadius: '16px',
+                                      padding: '14px 18px',
+                                      fontSize: '13px',
+                                      fontWeight: '600',
+                                    },
+                                  });
                                 }}
                                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-white/10 hover:border-primary/50 bg-white/5 hover:bg-primary/10 transition-all text-xs text-white/80"
                               >
@@ -2356,13 +2373,6 @@ export default function HomePage() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsProductModalOpen(false)}
-                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </DialogHeader>
 
             {/* 搜索与分类筛选栏 */}
