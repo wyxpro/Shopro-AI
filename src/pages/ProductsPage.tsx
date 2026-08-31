@@ -438,6 +438,9 @@ export default function ProductsPage() {
   const [parseProgress, setParseProgress] = useState(0);
   const [parsedResult, setParsedResult] = useState<any | null>(null);
   const [savingParsed, setSavingParsed] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [deletedIds, setDeletedIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('shopro_deleted_product_ids');
@@ -796,6 +799,77 @@ JSON 字段要求如下：
     URL.revokeObjectURL(url);
   };
 
+  const handleImportFile = async (file: File) => {
+    if (!file.name.endsWith('.csv')) { toast.error('请上传 CSV 格式文件'); return; }
+    setImporting(true);
+    setImportErrors([]);
+    try {
+      const text = await file.text();
+      const lines = text.replace(/\r/g, '').split('\n').filter(Boolean);
+      if (lines.length < 2) { toast.error('CSV 文件内容为空'); setImporting(false); return; }
+      const dataLines = lines.slice(1);
+      const parseRow = (line: string): string[] => {
+        const cols: string[] = [];
+        let cur = '', inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { inQ = !inQ; continue; }
+          if (ch === ',' && !inQ) { cols.push(cur); cur = ''; continue; }
+          cur += ch;
+        }
+        cols.push(cur);
+        return cols;
+      };
+      const errs: string[] = [];
+      const payloads: object[] = [];
+      dataLines.forEach((line, idx) => {
+        const cols = parseRow(line);
+        const name = cols[0]?.trim();
+        if (!name) { errs.push(`第 ${idx + 2} 行：商品名称不能为空`); return; }
+        const price = parseFloat(cols[4] ?? '') || null;
+        const salePrice = parseFloat(cols[5] ?? '') || null;
+        const stock = parseInt(cols[6] ?? '') || 0;
+        payloads.push({
+          name,
+          category: cols[1]?.trim() || '其他',
+          sub_category: cols[2]?.trim() || null,
+          description: cols[3]?.trim() || null,
+          original_price: price,
+          sale_price: salePrice,
+          stock,
+          status: (['active', 'inactive', 'draft'].includes(cols[7]?.trim()) ? cols[7]?.trim() : 'draft') as 'active' | 'inactive' | 'draft',
+          sales_count: parseInt(cols[8] ?? '') || 0,
+          selling_points: cols[9]?.split('|').map(s => s.trim()).filter(Boolean) ?? [],
+          images: [],
+          cover_image: null,
+          user_id: user!.id,
+        });
+      });
+      setImportErrors(errs);
+      if (payloads.length === 0) { toast.error('没有有效数据可导入'); setImporting(false); return; }
+      const { error } = await supabase.from('products').insert(payloads);
+      if (error) throw error;
+      toast.success(`成功导入 ${payloads.length} 个商品${errs.length > 0 ? `，跳过 ${errs.length} 行错误数据` : ''}`);
+      setImportOpen(false);
+      loadProducts();
+    } catch (e: unknown) {
+      toast.error('导入失败：' + (e instanceof Error ? e.message : '未知错误'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const header = '"商品名称","分类","子分类","描述","原价","售价","库存","状态","销量","卖点"';
+    const example = '"示例商品","美妆护肤","面霜","这是一款示例商品","299","199","100","active","0","保湿滋润|温和不刺激"';
+    const csv = [header, example].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '商品导入模板.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-5">
       {/* 页头 */}
@@ -825,6 +899,9 @@ JSON 字段要求如下：
             </Button>
             <Button onClick={openAdd} className="h-9 rounded-xl font-semibold">
               <Plus className="w-4 h-4 mr-1.5" />添加商品
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 text-xs rounded-xl" onClick={() => setImportOpen(true)}>
+              <FileSpreadsheet className="w-4 h-4 mr-1.5 text-rose-500" />批量导入
             </Button>
             <Button variant="outline" size="sm" className="h-9 text-xs rounded-xl" onClick={handleExport}>
               <Download className="w-4 h-4 mr-1.5 text-muted-foreground" />导出CSV

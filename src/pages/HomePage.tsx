@@ -351,6 +351,39 @@ export default function HomePage() {
     location.state?.selectedAvatar ?? null
   );
 
+  const [prompt, setPrompt] = useState('');
+
+  // ── 商品选择弹窗及提取提示词相关状态 ──────────────────────────
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productsList, setProductsList] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('全部');
+
+  const loadProductsForSelector = useCallback(async () => {
+    setLoadingProducts(true);
+    try {
+      const DEMO_UID = '7d58d08f-8aa3-43f5-a30f-b7495d59d147';
+      let query = supabase.from('products').select('*');
+      if (user?.id) {
+        query = query.or(`user_id.eq.${user.id},user_id.eq.${DEMO_UID}`);
+      }
+      const { data } = await query.order('created_at', { ascending: false });
+
+      if (data && data.length > 0) {
+        setProductsList(data as Product[]);
+      } else {
+        setProductsList(MOCK_SELECTOR_PRODUCTS);
+      }
+    } catch (err) {
+      console.error('Failed to fetch products for selector:', err);
+      setProductsList(MOCK_SELECTOR_PRODUCTS);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [user]);
+
   const handleSelectProduct = useCallback((prod: Product) => {
     setSelectedProduct(prod);
     setIsProductModalOpen(false);
