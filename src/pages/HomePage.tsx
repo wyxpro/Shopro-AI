@@ -3,7 +3,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Sparkles, ChevronDown, ImageIcon, Video, Wand2,
   BarChart2, Droplets, ArrowUpCircle, Mic, Globe, RefreshCcw,
-  MoreHorizontal, Maximize2, Copy, Plus, ChevronRight, Loader2, X, Download, Image as ImageIcon2, Layers, Play, User, Users2
+  MoreHorizontal, Maximize2, Copy, Plus, ChevronRight, Loader2, X, Download, Image as ImageIcon2, Layers, Play, User, Users2,
+  ShoppingBag, Package, Search, Check, Tag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/db/supabase';
@@ -15,6 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { sendDeepSeekStreamRequest, sendStepAudioASR, submitSeedanceVideo, querySeedanceVideo, sendStepFlashStreamRequest } from '@/lib/sse';
 import { extractVideoFirstFrame, getVideoCoverImage } from '@/lib/videoFrame';
 import { audioRecorder } from '@/lib/audioRecorder';
+import { Product } from '@/types/types';
+import { getCategoryFallbackImage } from './ProductsPage';
 
 
 
@@ -178,7 +181,121 @@ const FILTER_CONFIG = [
 ];
 
 const MAIN_TABS = ['视频生成', '分镜编辑', '图片生成'];
-const INPUT_TABS = ['参考', '数字人', '首尾帧'];
+const INPUT_TABS = ['参考', '商品', '数字人', '首尾帧'];
+
+// 预设高品质演示备选商品列表
+const MOCK_SELECTOR_PRODUCTS: Product[] = [
+  {
+    id: 'prod-001',
+    user_id: 'demo',
+    name: '极简美学 冰感丝滑防晒外套',
+    category: '服装配饰',
+    sub_category: '女装',
+    description: '采用UPF50+高倍防晒微孔原纱面料，轻盈透气，体感瞬降5℃，告别闷热闷汗，修身立体剪裁，户外出行与日常通勤百搭必备。',
+    selling_points: ['UPF50+高倍防晒', '冰感凉爽降温5℃', '微孔透气不闷汗'],
+    ai_selling_points: ['修身显瘦版型', '加长遮掌设计'],
+    original_price: 299,
+    sale_price: 129,
+    stock: 850,
+    specs: [{ name: '颜色', value: '冰川白/烟波粉/曜石黑' }],
+    images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80'],
+    cover_image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80',
+    status: 'active',
+    sales_count: 3420,
+    target_language: 'zh',
+    target_platform: 'douyin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-002',
+    user_id: 'demo',
+    name: '光采焕亮 玻色因紧致精华眼霜',
+    category: '美妆护肤',
+    sub_category: '眼部护理',
+    description: '蕴含30%高浓度玻色因与九肽复合物，协同冰感锌合金按摩头，精准抚平眼周细纹干纹，淡化黑眼圈，提拉紧致眼部轮廓。',
+    selling_points: ['30%高浓度玻色因', '冰感锌合金按摩头', '7天实测淡化细纹'],
+    ai_selling_points: ['改善熬夜黑眼圈', '温和敏感肌可用'],
+    original_price: 499,
+    sale_price: 239,
+    stock: 520,
+    specs: [{ name: '净含量', value: '20g/支' }],
+    images: ['https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=500&auto=format&fit=crop&q=80'],
+    cover_image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=500&auto=format&fit=crop&q=80',
+    status: 'active',
+    sales_count: 5890,
+    target_language: 'zh',
+    target_platform: 'douyin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-003',
+    user_id: 'demo',
+    name: '空间声学 空间音频主动降噪耳机 Pro',
+    category: '数码电器',
+    sub_category: '音频设备',
+    description: '搭载48dB深度混合主动降噪算法与钛合金振膜动圈单元，支持LDAC高解析音频传输，40小时全天候超长续航，双麦克风AI通话降噪。',
+    selling_points: ['48dB深度智能降噪', 'LDAC无损高解析音质', '40小时长效续航'],
+    ai_selling_points: ['人体工学零压佩戴', '双设备无缝连接'],
+    original_price: 899,
+    sale_price: 399,
+    stock: 310,
+    specs: [{ name: '版本', value: '主动降噪旗舰版' }],
+    images: ['https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&auto=format&fit=crop&q=80'],
+    cover_image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&auto=format&fit=crop&q=80',
+    status: 'active',
+    sales_count: 2150,
+    target_language: 'zh',
+    target_platform: 'douyin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-004',
+    user_id: 'demo',
+    name: '高山原叶 手作冷萃白桃乌龙茶包',
+    category: '食品饮料',
+    sub_category: '冲饮茶包',
+    description: '甄选高山一级乌龙茶原叶配伍真白桃果粒，采用冷热双萃工艺，0糖0脂0卡，水润清甜，回甘持久，随时随地享受精致冷萃茶道。',
+    selling_points: ['高山原叶+真白桃果粒', '0糖0脂0卡无负担', '冷热双萃3秒出味'],
+    ai_selling_points: ['玉米纤维三角立体茶包', '独立防潮包装'],
+    original_price: 99,
+    sale_price: 49.9,
+    stock: 1200,
+    specs: [{ name: '规格', value: '30包/盒' }],
+    images: ['https://images.unsplash.com/photo-1612927601601-6638404737ce?w=500&auto=format&fit=crop&q=80'],
+    cover_image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=500&auto=format&fit=crop&q=80',
+    status: 'active',
+    sales_count: 9800,
+    target_language: 'zh',
+    target_platform: 'douyin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'prod-005',
+    user_id: 'demo',
+    name: '自然沉香 悬浮感天然慢回弹枕',
+    category: '家居用品',
+    sub_category: '家纺寝具',
+    description: '采用非温感慢回弹记忆棉核心，开创双向弧形颈椎托举结构，透气天丝提花枕套，有效释放肩颈压力，深度改善睡眠质量。',
+    selling_points: ['人体工学颈椎双向托举', '非温感慢回弹记忆棉', '天丝抑菌亲肤枕套'],
+    ai_selling_points: ['分散头颈85%压力', '支持全枕无残留冲洗'],
+    original_price: 359,
+    sale_price: 168,
+    stock: 450,
+    specs: [{ name: '高度', value: '10/12cm曲面双高' }],
+    images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&auto=format&fit=crop&q=80'],
+    cover_image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=500&auto=format&fit=crop&q=80',
+    status: 'active',
+    sales_count: 4120,
+    target_language: 'zh',
+    target_platform: 'douyin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+];
 
 // ── 图片生成模型与对应标识 ──────────────────────────────────────────────
 const IMG_MODELS = [
@@ -242,6 +359,80 @@ export default function HomePage() {
   }, [location.state]);
 
   const [prompt, setPrompt] = useState('');
+
+  // ── 新增商品选择弹窗及提取提示词相关状态 ──────────────────────────
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productsList, setProductsList] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('全部');
+
+  const loadProductsForSelector = useCallback(async () => {
+    setLoadingProducts(true);
+    try {
+      const DEMO_UID = '7d58d08f-8aa3-43f5-a30f-b7495d59d147';
+      let query = supabase.from('products').select('*');
+      if (user?.id) {
+        query = query.or(`user_id.eq.${user.id},user_id.eq.${DEMO_UID}`);
+      }
+      const { data } = await query.order('created_at', { ascending: false });
+
+      if (data && data.length > 0) {
+        setProductsList(data as Product[]);
+      } else {
+        setProductsList(MOCK_SELECTOR_PRODUCTS);
+      }
+    } catch (err) {
+      console.error('Failed to fetch products for selector:', err);
+      setProductsList(MOCK_SELECTOR_PRODUCTS);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [user]);
+
+  const handleSelectProduct = (prod: Product) => {
+    setSelectedProduct(prod);
+    setIsProductModalOpen(false);
+
+    const points = (prod.selling_points || []).filter(Boolean);
+    const aiPoints = (prod.ai_selling_points || []).filter(Boolean);
+    const allPoints = Array.from(new Set([...points, ...aiPoints]));
+    const priceText = prod.sale_price != null ? `¥${prod.sale_price}` : prod.original_price != null ? `¥${prod.original_price}` : '';
+
+    let generatedPrompt = `【爆款电商带货视频】${prod.name}`;
+    if (prod.category) generatedPrompt += `（${prod.category}）`;
+    if (priceText) generatedPrompt += ` | 特惠活动价：${priceText}`;
+
+    if (allPoints.length > 0) {
+      generatedPrompt += `\n✨ 核心卖点：${allPoints.join('；')}`;
+    }
+
+    if (prod.description) {
+      generatedPrompt += `\n📝 商品详情描述：${prod.description.trim()}`;
+    }
+
+    generatedPrompt += `\n🎥 视频分镜与视角要求：镜头首先前3秒高清特写展示${prod.name}的高保真实物细节与质感，痛点引发共鸣，接着自然过渡至使用场景演示，配合柔和高光与动态转场，突出${allPoints[0] || '核心优势'}，最后高能促成买家下单。`;
+
+    setPrompt(generatedPrompt);
+
+    toast.success(`已成功选择商品「${prod.name}」，关键卖点与描述信息已自动生成并填充至提示词脚本！`, {
+      duration: 4000,
+    });
+  };
+
+  const filteredSelectorProducts = productsList.filter(prod => {
+    if (selectedCategoryFilter !== '全部' && prod.category !== selectedCategoryFilter) return false;
+    if (productSearch.trim()) {
+      const q = productSearch.toLowerCase();
+      const matchName = (prod.name || '').toLowerCase().includes(q);
+      const matchCategory = (prod.category || '').toLowerCase().includes(q);
+      const matchPoints = [...(prod.selling_points || []), ...(prod.ai_selling_points || [])].some(pt => pt.toLowerCase().includes(q));
+      const matchDesc = (prod.description || '').toLowerCase().includes(q);
+      return matchName || matchCategory || matchPoints || matchDesc;
+    }
+    return true;
+  });
   const [model, setModel] = useState<{ label: string; id: ModelId }>({ label: 'Seedance 2.0', id: 'Seedance' });
   const [resolution, setResolution] = useState('720P · 16:9 · 5s');
   const [modelOpen, setModelOpen] = useState(false);
@@ -1049,11 +1240,18 @@ export default function HomePage() {
               <div className="flex items-center justify-between px-3 md:px-4 pt-3 pb-1">
                 <div className="flex items-center gap-0.5 overflow-x-auto">
                   {INPUT_TABS.map(t => (
-                    <button key={t} onClick={() => setInputTab(t)}
+                    <button key={t} onClick={() => {
+                      setInputTab(t);
+                      if (t === '商品') {
+                        setIsProductModalOpen(true);
+                        loadProductsForSelector();
+                      }
+                    }}
                       className={cn('flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap shrink-0',
                         inputTab === t ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70')}
                     >
                       {t === '参考' && <ImageIcon className="w-3.5 h-3.5" />}
+                      {t === '商品' && <Package className="w-3.5 h-3.5 text-amber-400" />}
                       {t === '首尾帧' && <Copy className="w-3.5 h-3.5" />}
                       {t === '数字人' && <Users2 className="w-3.5 h-3.5 text-primary" />}
                       {t === '编辑' && <Wand2 className="w-3.5 h-3.5" />}
@@ -1177,6 +1375,63 @@ export default function HomePage() {
                             </>
                           )}
                         </div>
+                      </div>
+                    ) : inputTab === '商品' ? (
+                      <div className="flex items-center gap-1.5 shrink-0 mr-1 select-none">
+                        {selectedProduct ? (
+                          <div className="flex items-center gap-2 bg-amber-950/40 border border-amber-500/40 rounded-xl px-2.5 py-1.5 text-xs text-white relative shadow-md">
+                            <img
+                              src={selectedProduct.cover_image || getCategoryFallbackImage(selectedProduct.category)}
+                              alt={selectedProduct.name}
+                              className="w-10 h-10 rounded-lg object-cover border border-amber-400/40 shrink-0"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = getCategoryFallbackImage(selectedProduct.category);
+                              }}
+                            />
+                            <div className="flex flex-col min-w-0 max-w-[160px]">
+                              <span className="font-bold text-amber-200 text-xs truncate" title={selectedProduct.name}>
+                                {selectedProduct.name}
+                              </span>
+                              <div className="flex items-center gap-1.5 text-[10px] text-amber-300/80">
+                                <span className="bg-amber-500/20 px-1 rounded">{selectedProduct.category}</span>
+                                {(selectedProduct.sale_price ?? selectedProduct.original_price) && (
+                                  <span className="font-semibold text-amber-400">¥{selectedProduct.sale_price ?? selectedProduct.original_price}</span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsProductModalOpen(true);
+                                loadProductsForSelector();
+                              }}
+                              className="text-[10px] text-amber-300 underline hover:text-amber-100 ml-1"
+                            >
+                              更换
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProduct(null)}
+                              className="w-4 h-4 rounded-full bg-black/60 hover:bg-black flex items-center justify-center text-white ml-1"
+                              title="清除商品"
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsProductModalOpen(true);
+                              loadProductsForSelector();
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:border-amber-400/60 hover:bg-amber-500/25 transition-all text-xs font-semibold text-amber-200 shadow-sm group"
+                          >
+                            <ShoppingBag className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                            <span>选择商品管理中的商品</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-amber-400/70" />
+                          </button>
+                        )}
                       </div>
                     ) : inputTab === '数字人' ? (
                       <div className="flex flex-col gap-1.5 shrink-0 mr-1 select-none">
@@ -2066,6 +2321,202 @@ export default function HomePage() {
             </Dialog>
           );
         })()}
+
+        {/* 选择商品管理中的商品 弹窗 */}
+        <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[85vh] bg-[#16151f] border-white/10 text-white p-0 overflow-hidden flex flex-col rounded-2xl shadow-2xl">
+            {/* 弹窗头部 */}
+            <DialogHeader className="p-5 border-b border-white/10 bg-gradient-to-r from-amber-950/50 via-purple-950/40 to-[#16151f] flex flex-row items-center justify-between space-y-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                    选择商品管理中的商品
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-normal border border-amber-500/30">
+                      {filteredSelectorProducts.length} 款可选用
+                    </span>
+                  </DialogTitle>
+                  <p className="text-xs text-white/50 mt-0.5">
+                    选择商品后将自动提取标题、活动价格、核心卖点与详细描述，一键转换填充为带货脚本提示词
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </DialogHeader>
+
+            {/* 搜索与分类筛选栏 */}
+            <div className="p-4 border-b border-white/10 bg-white/[0.02] space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="搜索商品名称、核心卖点、品牌或分类..."
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500/60"
+                  />
+                  {productSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setProductSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProductModalOpen(false);
+                    navigate('/products');
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-semibold text-amber-300 hover:text-amber-200 transition-colors shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  管理已有商品
+                </button>
+              </div>
+
+              {/* 分类切换 */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                {['全部', '服装配饰', '美妆护肤', '数码电器', '食品饮料', '家居用品'].map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategoryFilter(cat)}
+                    className={cn(
+                      'px-3 py-1 rounded-lg text-xs font-medium transition-all shrink-0 border',
+                      selectedCategoryFilter === cat
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm'
+                        : 'bg-white/5 border-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 商品列表 */}
+            <div className="flex-1 overflow-y-auto p-4 max-h-[460px] space-y-3">
+              {loadingProducts ? (
+                <div className="py-16 text-center text-white/50 space-y-2">
+                  <Loader2 className="w-7 h-7 animate-spin text-amber-400 mx-auto" />
+                  <p className="text-xs">正在加载商品管理库中的数据...</p>
+                </div>
+              ) : filteredSelectorProducts.length === 0 ? (
+                <div className="py-16 text-center text-white/50 space-y-3">
+                  <Package className="w-10 h-10 text-white/20 mx-auto" />
+                  <p className="text-sm">未搜索到相关商品</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProductModalOpen(false);
+                      navigate('/products');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-amber-500 text-black font-semibold text-xs hover:bg-amber-400 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    前往「商品管理」添加商品
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filteredSelectorProducts.map(prod => {
+                    const isSelected = selectedProduct?.id === prod.id;
+                    const points = [...(prod.selling_points || []), ...(prod.ai_selling_points || [])].filter(Boolean);
+                    const price = prod.sale_price ?? prod.original_price;
+
+                    return (
+                      <div
+                        key={prod.id}
+                        onClick={() => handleSelectProduct(prod)}
+                        className={cn(
+                          'p-3 rounded-xl border transition-all cursor-pointer flex gap-3 group relative overflow-hidden',
+                          isSelected
+                            ? 'bg-amber-500/15 border-amber-500/60 ring-1 ring-amber-500/40 shadow-lg'
+                            : 'bg-white/5 border-white/10 hover:border-amber-500/40 hover:bg-white/[0.08]'
+                        )}
+                      >
+                        {/* 封面图 */}
+                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-black/40 shrink-0 border border-white/10 relative">
+                          <img
+                            src={prod.cover_image || getCategoryFallbackImage(prod.category)}
+                            alt={prod.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = getCategoryFallbackImage(prod.category);
+                            }}
+                          />
+                          <span className="absolute bottom-1 left-1 text-[9px] px-1 py-0.2 rounded bg-black/70 text-white/80 font-medium">
+                            {prod.category}
+                          </span>
+                        </div>
+
+                        {/* 描述信息 */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          <div>
+                            <h4 className="text-sm font-semibold text-white group-hover:text-amber-300 transition-colors line-clamp-1">
+                              {prod.name}
+                            </h4>
+                            {price && (
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-sm font-bold text-amber-400">¥{price}</span>
+                                {prod.original_price && prod.sale_price && prod.original_price > prod.sale_price && (
+                                  <span className="text-[10px] text-white/40 line-through">¥{prod.original_price}</span>
+                                )}
+                              </div>
+                            )}
+                            {points.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {points.slice(0, 2).map((pt, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-200/90 border border-amber-500/20 max-w-[130px] truncate"
+                                  >
+                                    ⚡ {pt}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5">
+                            <span className="text-[10px] text-white/40">
+                              月销: {prod.sales_count || 0}
+                            </span>
+                            <button
+                              type="button"
+                              className={cn(
+                                'text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1',
+                                isSelected
+                                  ? 'bg-amber-500 text-black'
+                                  : 'bg-amber-500/20 text-amber-300 group-hover:bg-amber-500 group-hover:text-black'
+                              )}
+                            >
+                              {isSelected ? <Check className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+                              {isSelected ? '已选此商品' : '提取视频脚本'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
