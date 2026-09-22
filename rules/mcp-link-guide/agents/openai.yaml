@@ -1,4 +1,0 @@
-interface:
-  display_name: "MCP 链接生成指南"
-  short_description: "指导生成、部署并验证赛事可用的公网 MCP 接口链接"
-  default_prompt: "Use $mcp-link-guide to generate and verify a public Streamable HTTP MCP URL."
