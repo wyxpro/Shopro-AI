@@ -92,6 +92,7 @@ const RESOLUTIONS = ['720P · 16:9 · 5s', '1080P · 9:16 · 10s', '4K · 1:1 ·
 const INSPIRE_VIDEOS = [
   {
     url: '/Video/CreatOK_2.mp4',
+    cover: '/Video/covers/CreatOK_2.webp',
     prompt: '时尚秋季外套女款展示，微风吹拂，高级质感，落叶背景',
     model: 'Seedance 2.0',
     ratio: '9:16',
@@ -102,6 +103,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_4.mp4',
+    cover: '/Video/covers/CreatOK_4.webp',
     prompt: 'Makeup foundation application, close up on skin smooth blending, soft natural lighting',
     model: 'Kling',
     ratio: '16:9',
@@ -112,6 +114,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_5.mp4',
+    cover: '/Video/covers/CreatOK_5.webp',
     prompt: 'Smart watch rotate view, carbon fiber strap, holographic display neon accent',
     model: 'Kling-V3',
     ratio: '1:1',
@@ -122,6 +125,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_6.mp4',
+    cover: '/Video/covers/CreatOK_6.webp',
     prompt: '美味草莓芝士蛋糕切片，淋上红莓果酱，慢动作，诱人甜点',
     model: 'Seedance 2.0',
     ratio: '9:16',
@@ -132,6 +136,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_7.mp4',
+    cover: '/Video/covers/CreatOK_7.webp',
     prompt: 'Nordic style living room, cozy sofa, plant leaf shadow, warm aesthetic room tour',
     model: 'Seedance 2.0',
     ratio: '16:9',
@@ -142,6 +147,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_8.mp4',
+    cover: '/Video/covers/CreatOK_8.webp',
     prompt: '运动女鞋减震底测试，慢镜头起跳落地，水花四溅效果',
     model: 'Seedance 2.0',
     ratio: '9:16',
@@ -152,6 +158,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_9.mp4',
+    cover: '/Video/covers/CreatOK_9.webp',
     prompt: 'Organic lipstick swatch on hand, gloss reflection, flowers around, cosmetic brand ad',
     model: 'Kling',
     ratio: '9:16',
@@ -162,6 +169,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_10.mp4',
+    cover: '/Video/covers/CreatOK_10.webp',
     prompt: 'Wireless earbuds falling into water, high speed splash capture, blue ambient lighting',
     model: 'Kling-V3',
     ratio: '3:4',
@@ -172,6 +180,7 @@ const INSPIRE_VIDEOS = [
   },
   {
     url: '/Video/CreatOK_11.mp4',
+    cover: '/Video/covers/CreatOK_11.webp',
     prompt: '咖啡拿铁拉花艺术过程，心形图案，温暖日光，精致陶瓷杯',
     model: 'Seedance 2.0',
     ratio: '9:16',
@@ -3076,15 +3085,21 @@ export default function HomePage() {
                   >
                     <video
                       src={video.url}
+                      poster={(video as any).cover}
                       muted
                       loop
                       playsInline
-                      preload="metadata"
+                      preload="none"
                       className="w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
                       }}
                     />
+                    {/* 静止状态左下角播放提示小标 */}
+                    <div className="absolute bottom-2 left-2 opacity-70 group-hover:opacity-0 transition-opacity flex items-center gap-1 text-[9px] text-white/80 bg-black/60 px-1.5 py-0.5 rounded backdrop-blur">
+                      <Play className="w-2.5 h-2.5 fill-white/80" />
+                      <span>预览</span>
+                    </div>
                     <div className="absolute top-2 right-2 opacity-100 group-hover:opacity-0 transition-opacity">
                       <span className="text-[10px] px-2 py-0.5 rounded-md bg-black/60 text-white/80 backdrop-blur">{video.model}</span>
                     </div>

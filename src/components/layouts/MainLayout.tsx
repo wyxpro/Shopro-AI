@@ -508,103 +508,103 @@ function CreditsDetailModal({ open, onOpenChange }: { open: boolean; onOpenChang
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[620px] p-0 overflow-hidden bg-[#16151f] border border-pink-500/20 text-white rounded-2xl shadow-2xl">
-        <DialogHeader className="p-6 pb-4 bg-gradient-to-r from-pink-950/40 via-purple-950/30 to-zinc-900 border-b border-white/10">
+      <DialogContent className="w-[92vw] max-w-[580px] max-h-[88vh] p-0 overflow-hidden bg-[#16151f] border border-pink-500/20 text-white rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col my-auto">
+        <DialogHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3.5 bg-gradient-to-r from-pink-950/40 via-purple-950/30 to-zinc-900 border-b border-white/10 shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-500/20 shrink-0">
-                <Zap className="w-5 h-5 text-white fill-white" />
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-500/20 shrink-0">
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white fill-white" />
               </div>
               <div>
-                <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                <DialogTitle className="text-base sm:text-lg font-bold text-white flex items-center gap-1.5 sm:gap-2">
                   积分管理与充值
-                  <Badge variant="outline" className="border-pink-500/40 text-pink-400 text-[10px] font-normal">10积分 = 1元</Badge>
+                  <Badge variant="outline" className="border-pink-500/40 text-pink-400 text-[9px] sm:text-[10px] font-normal py-0">10积分 = 1元</Badge>
                 </DialogTitle>
-                <p className="text-xs text-zinc-400 mt-0.5">注册新用户免费赠送 {REGISTER_BONUS_CREDITS} 积分，生成视频消耗 10 积分/次（10积分 = 1元）</p>
+                <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5">新用户免费赠送 {REGISTER_BONUS_CREDITS} 积分，生成视频消耗 10 积分/次</p>
               </div>
             </div>
           </div>
 
           {/* 当前余额卡片 */}
-          <div className="mt-4 p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+          <div className="mt-2.5 sm:mt-3.5 p-2.5 sm:p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
             <div>
-              <span className="text-xs text-zinc-400">当前可用积分余额</span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-2xl font-bold font-mono text-pink-300">{creditsLeft.toLocaleString()}</span>
-                <span className="text-xs text-pink-400 font-medium">积分 (约可生成 {Math.floor(creditsLeft / 10)} 个视频)</span>
+              <span className="text-[10px] sm:text-xs text-zinc-400">可用积分余额</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-xl sm:text-2xl font-bold font-mono text-pink-300">{creditsLeft.toLocaleString()}</span>
+                <span className="text-[10px] sm:text-xs text-pink-400 font-medium">积分 (约可生成 {Math.floor(creditsLeft / 10)} 个成片)</span>
               </div>
             </div>
             <div className="text-right">
-              <span className="text-[11px] text-zinc-400 block">注册赠送积分</span>
-              <span className="text-xs text-emerald-400 font-medium">已自动到账 (+{REGISTER_BONUS_CREDITS})</span>
+              <span className="text-[9px] sm:text-[11px] text-zinc-400 block">注册赠送</span>
+              <span className="text-[10px] sm:text-xs text-emerald-400 font-medium">已到账 (+{REGISTER_BONUS_CREDITS})</span>
             </div>
           </div>
 
           {/* 切换 Tab */}
-          <div className="flex gap-2 pt-3">
+          <div className="flex gap-1.5 sm:gap-2 pt-2.5 sm:pt-3">
             <button
               onClick={() => setActiveTab('recharge')}
-              className={cn('flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
+              className={cn('flex-1 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex items-center justify-center gap-1 sm:gap-1.5',
                 activeTab === 'recharge' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'text-zinc-400 hover:text-white bg-white/5')}
             >
-              <CreditCard className="w-3.5 h-3.5" />积分充值套餐
+              <CreditCard className="w-3 h-3 sm:w-3.5 sm:h-3.5" />积分充值套餐
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={cn('flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
+              className={cn('flex-1 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
                 activeTab === 'history' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'text-zinc-400 hover:text-white bg-white/5')}
             >
-              <History className="w-3.5 h-3.5" />积分变动明细
+              <History className="w-3 h-3 sm:w-3.5 sm:h-3.5" />变动明细
             </button>
           </div>
         </DialogHeader>
 
-        <div className="p-6 pt-3 max-h-[400px] overflow-y-auto space-y-4">
+        <div className="p-3.5 sm:p-5 pt-2.5 sm:pt-3 overflow-y-auto space-y-3 sm:space-y-4 flex-1">
           {activeTab === 'recharge' ? (
             <>
-              {/* 充值套餐网格 */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* 充值套餐网格：移动端精致紧凑排版 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 {PACKAGES.map(pkg => (
                   <div
                     key={pkg.id}
                     onClick={() => setSelectedPkg(pkg.id)}
                     className={cn(
-                      'relative p-4 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col justify-between',
+                      'relative p-2.5 sm:p-3.5 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col justify-between',
                       selectedPkg === pkg.id
-                        ? 'bg-amber-500/10 border-amber-500 shadow-md shadow-amber-500/10 scale-[1.02]'
+                        ? 'bg-amber-500/10 border-amber-500 shadow-md shadow-amber-500/10 scale-[1.01]'
                         : 'bg-white/5 border-white/10 hover:border-amber-500/40'
                     )}
                   >
                     {pkg.popular && (
-                      <span className="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm">
+                      <span className="absolute -top-2 right-2.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm">
                         {pkg.tag}
                       </span>
                     )}
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-zinc-200">{pkg.name}</span>
-                        {!pkg.popular && <span className="text-[10px] text-amber-400/80">{pkg.tag}</span>}
+                        {!pkg.popular && <span className="text-[9px] text-amber-400/80">{pkg.tag}</span>}
                       </div>
-                      <div className="mt-2 flex items-baseline gap-1">
-                        <span className="text-xl font-bold font-mono text-white">{pkg.credits}</span>
-                        <span className="text-xs text-zinc-400">积分</span>
+                      <div className="mt-1.5 flex items-baseline gap-1">
+                        <span className="text-lg sm:text-xl font-bold font-mono text-white">{pkg.credits}</span>
+                        <span className="text-[11px] text-zinc-400">积分</span>
                         {pkg.bonus > 0 && (
-                          <Badge className="ml-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] px-1 py-0">
+                          <Badge className="ml-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] px-1 py-0">
                             +{pkg.bonus}赠额
                           </Badge>
                         )}
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                    <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between">
                       <div className="flex items-baseline gap-0.5">
-                        <span className="text-xs text-amber-400 font-bold">¥</span>
-                        <span className="text-lg font-bold text-amber-300 font-mono">{pkg.price}</span>
+                        <span className="text-[11px] text-amber-400 font-bold">¥</span>
+                        <span className="text-base sm:text-lg font-bold text-amber-300 font-mono">{pkg.price}</span>
                       </div>
                       <Button
                         size="sm"
                         onClick={(e) => { e.stopPropagation(); handlePay(pkg); }}
-                        className={cn('h-7 text-xs px-2.5 font-medium', selectedPkg === pkg.id ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' : 'variant-outline text-zinc-300')}
+                        className={cn('h-6 sm:h-7 text-[10px] sm:text-xs px-2.5 font-medium rounded-lg', selectedPkg === pkg.id ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' : 'variant-outline text-zinc-300')}
                       >
                         立即充值
                       </Button>
@@ -614,8 +614,8 @@ function CreditsDetailModal({ open, onOpenChange }: { open: boolean; onOpenChang
               </div>
 
               {/* 兑换码兑换 */}
-              <div className="mt-3 p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-2">
-                <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+              <div className="mt-2 p-2.5 sm:p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5">
+                <span className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
                   <Gift className="w-3.5 h-3.5 text-pink-400" />兑换码 / 卡券快速核销
                 </span>
                 <div className="flex gap-2">
@@ -624,9 +624,9 @@ function CreditsDetailModal({ open, onOpenChange }: { open: boolean; onOpenChang
                     value={couponCode}
                     onChange={e => setCouponCode(e.target.value)}
                     placeholder="输入兑换码 (例如 VIP888)"
-                    className="flex-1 h-8 px-3 rounded-lg bg-black/40 border border-white/15 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-pink-500"
+                    className="flex-1 h-7.5 sm:h-8 px-2.5 rounded-lg bg-black/40 border border-white/15 text-[11px] sm:text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-pink-500"
                   />
-                  <Button size="sm" onClick={handleRedeem} className="h-8 text-xs bg-pink-500 hover:bg-pink-600 text-white font-semibold">
+                  <Button size="sm" onClick={handleRedeem} className="h-7.5 sm:h-8 text-xs px-3 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-lg">
                     兑换
                   </Button>
                 </div>

@@ -64,17 +64,17 @@ export async function extractVideoMeta(videoUrl: string): Promise<{ frame: strin
   });
 }
 
-// 视频与本地真实首帧封面映射字典 (完美匹配真实第一帧图片，数据库刷新永远有效)
+// 视频与本地真实首帧封面映射字典 (极速秒开 WebP 高清封面，数据库与前端素材库秒开)
 export const VIDEO_COVER_MAP: Record<string, string> = {
-  '/Video/CreatOK_2.mp4': '/person/girl1.png',
-  '/Video/CreatOK_4.mp4': '/person/boy1.png',
-  '/Video/CreatOK_7.mp4': '/person/girl2.png',
-  '/Video/CreatOK_8.mp4': '/person/boy2.png',
-  '/Video/CreatOK_10.mp4': '/person/girl3.png',
-  '/Video/CreatOK_6.mp4': '/person/boy3.png',
-  '/Video/CreatOK_9.mp4': '/person/girl4.png',
-  '/Video/CreatOK_11.mp4': '/person/girl5.png',
-  '/Video/CreatOK_5.mp4': '/person/girl1.png',
+  '/Video/CreatOK_2.mp4': '/Video/covers/CreatOK_2.webp',
+  '/Video/CreatOK_4.mp4': '/Video/covers/CreatOK_4.webp',
+  '/Video/CreatOK_5.mp4': '/Video/covers/CreatOK_5.webp',
+  '/Video/CreatOK_6.mp4': '/Video/covers/CreatOK_6.webp',
+  '/Video/CreatOK_7.mp4': '/Video/covers/CreatOK_7.webp',
+  '/Video/CreatOK_8.mp4': '/Video/covers/CreatOK_8.webp',
+  '/Video/CreatOK_9.mp4': '/Video/covers/CreatOK_9.webp',
+  '/Video/CreatOK_10.mp4': '/Video/covers/CreatOK_10.webp',
+  '/Video/CreatOK_11.mp4': '/Video/covers/CreatOK_11.webp',
 };
 
 export async function getVideoCoverImage(videoUrl: string, avatarImage?: string, firstFrame?: string): Promise<string> {

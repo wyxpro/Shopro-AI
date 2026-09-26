@@ -635,42 +635,42 @@ export default function CreditsPage() {
 
       {/* 微信支付弹窗 */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
-        <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-sm p-6">
-          <DialogHeader>
-            <DialogTitle>微信支付</DialogTitle>
-            <DialogDescription>购买 {payingObj?.name}</DialogDescription>
+        <DialogContent className="w-[90vw] max-w-[380px] max-h-[85vh] p-4 sm:p-6 overflow-y-auto rounded-2xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-base sm:text-lg">微信支付</DialogTitle>
+            <DialogDescription className="text-xs">购买 {payingObj?.name}</DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-center py-6 gap-4">
-            <div className="text-4xl font-bold text-primary mb-2">
-              <span className="text-xl">¥</span>{payingObj?.price}
+          <div className="flex flex-col items-center py-2.5 sm:py-4 gap-2.5 sm:gap-3">
+            <div className="text-2xl sm:text-3xl font-bold text-primary mb-0.5">
+              <span className="text-base sm:text-lg">¥</span>{payingObj?.price}
             </div>
             
             {payStatus === 'creating' ? (
-              <div className="flex flex-col items-center justify-center p-8 gap-3 bg-muted/30 rounded-xl w-48 h-48 border border-border">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">正在生成支付码...</span>
+              <div className="flex flex-col items-center justify-center p-6 gap-2 bg-muted/30 rounded-xl w-36 h-36 sm:w-44 sm:h-44 border border-border">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">正在生成支付码...</span>
               </div>
             ) : payStatus === 'polling' && payUrl ? (
-              <div className="flex flex-col items-center p-4 bg-white rounded-xl shadow-sm border border-border">
-                <QRCodeDataUrl value={payUrl} size={200} />
-                <p className="text-sm text-gray-800 mt-4 flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />请使用微信扫码支付
+              <div className="flex flex-col items-center p-3 bg-white rounded-xl shadow-sm border border-border">
+                <QRCodeDataUrl value={payUrl} size={150} />
+                <p className="text-xs text-gray-800 mt-2.5 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />请使用微信扫码支付
                 </p>
               </div>
             ) : payStatus === 'success' ? (
-              <div className="flex flex-col items-center justify-center p-8 gap-3 bg-success/10 rounded-xl w-48 h-48 border border-success/30 text-success">
-                <CheckCircle2 className="w-10 h-10" />
-                <span className="font-medium">支付成功！</span>
+              <div className="flex flex-col items-center justify-center p-6 gap-2 bg-success/10 rounded-xl w-36 h-36 sm:w-44 sm:h-44 border border-success/30 text-success">
+                <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" />
+                <span className="font-medium text-xs sm:text-sm">支付成功！</span>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center p-8 gap-3 bg-destructive/10 rounded-xl w-48 h-48 border border-destructive/30 text-destructive">
-                <AlertCircle className="w-8 h-8" />
-                <span className="text-sm">网络错误或支付失败</span>
-                <Button size="sm" variant="outline" onClick={() => handleSelectPlan(payingObj!)}>重试</Button>
+              <div className="flex flex-col items-center justify-center p-6 gap-2 bg-destructive/10 rounded-xl w-36 h-36 sm:w-44 sm:h-44 border border-destructive/30 text-destructive">
+                <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8" />
+                <span className="text-xs">网络错误或支付失败</span>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleSelectPlan(payingObj!)}>重试</Button>
               </div>
             )}
             
-            <p className="text-xs text-muted-foreground mt-4 text-center">支付成功后将自动到账<br/>如遇问题请联系客服微信：wyx200265</p>
+            <p className="text-[11px] text-muted-foreground mt-2 text-center">支付成功后将自动到账<br/>如遇问题请联系客服微信：wyx200265</p>
           </div>
         </DialogContent>
       </Dialog>
