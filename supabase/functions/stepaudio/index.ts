@@ -1,52 +1,39 @@
-// StepAudio ASR & TTS SSE proxy Edge Function
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { handleCorsPreflight, getCorsHeaders } from '../_shared/cors.ts';
+import { authenticateRequest } from '../_shared/auth.ts';
+import { unauthorizedResponse, errorResponse } from '../_shared/errors.ts';
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
+  const corsHeaders = getCorsHeaders(req);
 
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
+  }
+
+  // 1. 强制 JWT 鉴权
+  const auth = await authenticateRequest(req);
+  if (auth.error) {
+    return unauthorizedResponse(auth.error, req);
   }
 
   let body: any;
   try {
     body = await req.json();
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: `Invalid JSON body: ${(err as Error).message}` }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return errorResponse(`Invalid JSON body: ${(err as Error).message}`, 400, 400, req);
   }
 
   const { action } = body;
   if (!action || (action !== 'asr' && action !== 'tts')) {
-    return new Response(
-      JSON.stringify({ error: 'Action must be either "asr" or "tts"' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return errorResponse('Action must be either "asr" or "tts"', 400, 400, req);
   }
 
-  let apiKey = Deno.env.get('STEP_API_KEY');
+  // 2. 仅从环境变量读取密钥，禁止任何本地 key.txt 兜底读取
+  const apiKey = Deno.env.get('STEP_API_KEY');
   if (!apiKey) {
-    try {
-      const keyUrl = new URL('./key.txt', import.meta.url);
-      apiKey = (await Deno.readTextFile(keyUrl)).trim();
-    } catch (err) {
-      console.error('Failed to read key.txt:', err);
-    }
-  }
-
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: 'Server configuration error: missing STEP_API_KEY' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return errorResponse('Server configuration error: missing STEP_API_KEY in environment', 500, 500, req);
   }
 
   if (action === 'asr') {

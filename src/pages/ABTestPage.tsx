@@ -80,10 +80,10 @@ function NewVariantForm({ projectId, onCreated }: { projectId: string; onCreated
     const { error } = await supabase.from('ab_test_variants').insert({
       project_id: projectId, user_id: user.id,
       variant_label: label, title, description: desc,
-      impressions: Math.floor(Math.random() * 3000) + 500,
-      clicks: Math.floor(Math.random() * 300) + 20,
-      conversions: Math.floor(Math.random() * 50) + 3,
-      watch_duration: +(Math.random() * 20 + 8).toFixed(1),
+      impressions: 0,
+      clicks: 0,
+      conversions: 0,
+      watch_duration: 0,
     });
     setSaving(false);
     if (error) { toast.error('创建失败：' + error.message); return; }

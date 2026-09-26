@@ -31,11 +31,25 @@ DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL") or "https://ai.dxkp.com/v1"
 STEP_BASE_URL = "https://api.stepfun.com/step_plan/v1"
 CDANCE_BASE_URL = os.getenv("VITE_CDANCE_BASE_URL") or "https://ai.dxkp.com/v1"
 
+MCP_SERVER_KEY = os.getenv("MCP_API_KEY") or os.getenv("MCP_AUTH_TOKEN")
+
 # In-memory task store for Cdance async completions
 mcp_task_store = {}
 
+def verify_auth(api_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """验证 MCP 工具调用的 API Key，防止未鉴权旁路调用"""
+    if MCP_SERVER_KEY:
+        if not api_key or api_key != MCP_SERVER_KEY:
+            return {"error": "unauthorized", "message": "Invalid or missing MCP_API_KEY"}
+    return None
+
 # Helper for wrapping tool calls with tracing and structured errors
-async def handle_tool_call(tool_name: str, coro):
+async def handle_tool_call(tool_name: str, coro, api_key: Optional[str] = None):
+    auth_err = verify_auth(api_key)
+    if auth_err:
+        logger.warning(f"Unauthorized tool call attempted: {tool_name}")
+        return auth_err
+
     trace_id = os.urandom(8).hex()
     logger.info(f"Tool call started: {tool_name} | Trace ID: {trace_id}")
     start_time = asyncio.get_event_loop().time()
@@ -187,7 +201,9 @@ async def synthesize_voice_tts(
     volume: float = 0.9
 ) -> Dict[str, Any]:
     async def _impl():
-        silicon_key = os.getenv("SILICONFLOW_API_KEY") or os.getenv("VITE_SILICONFLOW_API_KEY") or "sk-fvaewxbnaadhaixwxkrprqdasapwbxkvbypruvquadzeaxyn"
+        silicon_key = os.getenv("SILICONFLOW_API_KEY") or os.getenv("VITE_SILICONFLOW_API_KEY")
+        if not silicon_key:
+            return {"ok": False, "error": "missing SILICONFLOW_API_KEY in environment (server secret)"}
         silicon_base = os.getenv("SILICONFLOW_BASE_URL") or "https://api.siliconflow.cn/v1"
 
         async with httpx.AsyncClient(timeout=45.0) as client:
@@ -372,8 +388,8 @@ async def query_video_status(request_id: str) -> Dict[str, Any]:
     return await handle_tool_call("query_video_status", _impl())
 
 if __name__ == "__main__":
-    # Start the Streamable-HTTP server (listening on 8080 by default)
-    host = os.getenv("HOST", "0.0.0.0")
+    # Start the Streamable-HTTP server (listening on 127.0.0.1:8080 by default for reverse proxy safety)
+    host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", 8080))
     logger.info(f"Starting Shopro AI Full System MCP Server on {host}:{port} using streamable-http transport")
     mcp.settings.host = host

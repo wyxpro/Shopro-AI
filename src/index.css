@@ -511,3 +511,184 @@
 .animate-marquee-right:hover {
   animation-play-state: paused;
 }
+
+/* ── Hero 3D & E-Commerce Showcase 专有视觉增强 ── */
+.perspective-1200 {
+  perspective: 1200px;
+}
+.perspective-800 {
+  perspective: 800px;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+@keyframes spin-cube {
+  0%   { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  50%  { transform: rotateX(180deg) rotateY(180deg) rotateZ(90deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg); }
+}
+
+@keyframes float-slow-3d {
+  0%, 100% {
+    transform: translateY(0px) rotateX(0deg) rotateY(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotateX(3deg) rotateY(-3deg);
+  }
+}
+
+@keyframes wave-bounce {
+  0%, 100% { height: 6px; }
+  50% { height: 24px; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes grid-pan {
+  0% { background-position: 0 0; }
+  100% { background-position: 50px 50px; }
+}
+
+.hero-cyber-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 107, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 107, 0, 0.05) 1px, transparent 1px);
+}
+
+.hero-glow-sphere {
+  background: radial-gradient(circle at 35% 35%, rgba(255, 107, 0, 0.6) 0%, rgba(255, 60, 0, 0.25) 50%, transparent 80%);
+}
+
+.hero-hologram-border {
+  border: 1px solid rgba(255, 107, 0, 0.25);
+  box-shadow: 0 0 25px -5px rgba(255, 107, 0, 0.2), inset 0 0 15px -3px rgba(255, 107, 0, 0.1);
+}
+
+@keyframes spin-glow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes flare-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.98); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.animate-spin-glow {
+  animation: spin-glow 10s linear infinite;
+}
+
+.animate-flare-pulse {
+  animation: flare-pulse 4s ease-in-out infinite;
+}
+
+/* ── 工作台输入框环绕流光设计（纯净流畅彗星跑马光环） ── */
+@keyframes spin-clockwise {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.workspace-input-stream-single {
+  position: absolute;
+  width: 340%;
+  height: 340%;
+  top: -120%;
+  left: -120%;
+  animation: spin-clockwise 4.8s linear infinite;
+  pointer-events: none;
+  opacity: 1;
+}
+
+.workspace-input-stream-glow {
+  position: absolute;
+  width: 340%;
+  height: 340%;
+  top: -120%;
+  left: -120%;
+  animation: spin-clockwise 4.8s linear infinite;
+  pointer-events: none;
+  opacity: 0.7;
+  filter: blur(8px);
+}
+
+/* ── 萌系可爱进度条动效 ── */
+@keyframes progressStripes {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 40px 0;
+  }
+}
+
+.animate-progress-stripes {
+  animation: progressStripes 1.2s linear infinite;
+}
+
+@keyframes bounceGentle {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.08);
+  }
+}
+
+.animate-bounce-gentle {
+  animation: bounceGentle 1.8s ease-in-out infinite;
+}
+
+@keyframes cuteGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(236, 72, 153, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.7), 0 0 40px rgba(236, 72, 153, 0.4), inset 0 0 15px rgba(255, 255, 255, 0.4);
+  }
+}
+
+.cute-glow-pulse {
+  animation: cuteGlowPulse 2.4s ease-in-out infinite;
+}
+
+.candy-stripe-pattern {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.3) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.3) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 28px 28px;
+}
+
+@keyframes shimmerWave {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.animate-shimmer-wave {
+  animation: shimmerWave 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+
+

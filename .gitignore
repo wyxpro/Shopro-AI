@@ -34,3 +34,9 @@ history/*.json
 .vite_cache
 package.json.[0-9]*
 .env
+.workbuddy
+
+# Secrets and keys
+key.txt
+**/key.txt
+*.key

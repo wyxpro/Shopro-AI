@@ -18,7 +18,7 @@ import {
   TrendingUp, Zap, BarChart3, Play, Video, RefreshCw, Brain,
   ArrowUpRight, Lightbulb, CheckCircle2, AlertTriangle, Info,
   Clock, Subtitles, Music, Clapperboard, Target, ChevronRight,
-  Wand2, Sparkles, CalendarClock, FlameKindling, Star,
+  Wand2, Sparkles, CalendarClock, FlameKindling, Star, Scissors, Share2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { VideoProject, TrafficSuggestion } from '@/types/types';
@@ -227,6 +227,66 @@ export default function AnalyticsPage() {
   const [heatmapData, setHeatmapData] = useState<ReturnType<typeof generateHeatmapData>>([]);
   const [bestSlots, setBestSlots] = useState<{ day: string; hour: number; value: number }[]>([]);
 
+const DEMO_ANALYTICS_PROJECTS = [
+  {
+    id: 'demo-an-1',
+    user_id: 'demo',
+    title: '法式复古雾面哑光丝绒唇釉',
+    status: 'completed',
+    video_url: '/Video/CreatOK_2.mp4',
+    thumbnail_url: '/person/girl1.png',
+    duration: 25,
+    video_style: '美妆护肤',
+    target_platform: '抖音/小红书',
+    resolution: '1080×1920',
+    progress: 100,
+    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+    error_message: null,
+    predicted_completion_rate: 78,
+    predicted_click_rate: 5.6,
+    traffic_suggestions: null,
+  },
+  {
+    id: 'demo-an-2',
+    user_id: 'demo',
+    title: '智能降噪运动手表实测开箱',
+    status: 'completed',
+    video_url: '/Video/CreatOK_4.mp4',
+    thumbnail_url: '/person/boy1.png',
+    duration: 20,
+    video_style: '数码电器',
+    target_platform: 'TikTok/快手',
+    resolution: '1080×1920',
+    progress: 100,
+    created_at: new Date(Date.now() - 3600000 * 16).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 16).toISOString(),
+    error_message: null,
+    predicted_completion_rate: 85,
+    predicted_click_rate: 6.8,
+    traffic_suggestions: null,
+  },
+  {
+    id: 'demo-an-3',
+    user_id: 'demo',
+    title: '极简北欧风天然大豆香薰蜡烛',
+    status: 'completed',
+    video_url: '/Video/CreatOK_7.mp4',
+    thumbnail_url: '/person/girl2.png',
+    duration: 18,
+    video_style: '家居用品',
+    target_platform: '小红书/Instagram',
+    resolution: '1080×1080',
+    progress: 100,
+    created_at: new Date(Date.now() - 3600000 * 28).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 28).toISOString(),
+    error_message: null,
+    predicted_completion_rate: 72,
+    predicted_click_rate: 4.2,
+    traffic_suggestions: null,
+  },
+] as VideoProject[];
+
   useEffect(() => { loadProjects(); }, []);
   useEffect(() => {
     if (selectedId && projects.length > 0) {
@@ -240,9 +300,9 @@ export default function AnalyticsPage() {
     const { data } = await supabase.from('video_projects')
       .select('*').in('status', ['completed', 'processing'])
       .order('created_at', { ascending: false });
-    const projs = (data ?? []) as VideoProject[];
-    setProjects(projs);
-    if (!selectedId && projs.length > 0) setSelectedId(projs[0].id);
+    const rawList = Array.isArray(data) && data.length > 0 ? (data as VideoProject[]) : DEMO_ANALYTICS_PROJECTS;
+    setProjects(rawList);
+    if (!selectedId && rawList.length > 0) setSelectedId(rawList[0].id);
     setLoading(false);
   };
 
@@ -349,20 +409,27 @@ export default function AnalyticsPage() {
   return (
     <div className="p-4 md:p-6 space-y-5 animate-fade-in">
       {/* 页头 */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <h1 className="text-xl md:text-2xl font-bold text-balance flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary shrink-0" />作品流量预测
+            <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">预测</Badge>
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">AI预测视频流量 · 一键优化闭环 · 智能投放时间推荐</p>
+          <p className="text-sm text-muted-foreground mt-0.5">完播率预测 · 特征因子实时模拟 · 最佳投放时间推荐 · 一键智能优化闭环</p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Badge variant="outline" className="text-xs gap-1 border-primary/40 text-primary">
-            <Sparkles className="w-3 h-3" />CR-03
-          </Badge>
-          <Badge variant="outline" className="text-xs gap-1 border-info/40 text-info">
-            <CalendarClock className="w-3 h-3" />CR-07
-          </Badge>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => navigate('/works')}>
+            <Video className="w-4 h-4 text-primary" />作品素材
+          </Button>
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => navigate(`/video/edit?importId=${selectedId || ''}`)}>
+            <Scissors className="w-4 h-4 text-primary" />去剪辑微调
+          </Button>
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => navigate(`/export-formats?projectId=${selectedId || ''}`)}>
+            <Share2 className="w-4 h-4 text-emerald-500" />转码发布
+          </Button>
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => navigate(`/data-feedback?projectId=${selectedId || ''}`)}>
+            <BarChart3 className="w-4 h-4 text-amber-500" />投放分析大盘
+          </Button>
         </div>
       </div>
 

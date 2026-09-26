@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 const LoginPage       = lazy(() => import("@/pages/LoginPage"));
 const LandingPage     = lazy(() => import("@/pages/LandingPage"));
 const HomePage        = lazy(() => import("@/pages/HomePage"));
-const DashboardPage   = lazy(() => import("@/pages/DashboardPage"));
 const VideoCreatePage = lazy(() => import("@/pages/VideoCreatePage"));
 const WorksPage       = lazy(() => import("@/pages/WorksPage"));
 const AnalyticsPage   = lazy(() => import("@/pages/AnalyticsPage"));
@@ -54,6 +53,14 @@ const PersonalizePage        = lazy(() => import("@/pages/PersonalizePage"));
 const BatchCreatePage        = lazy(() => import("@/pages/BatchCreatePage"));
 const AiToolboxPage          = lazy(() => import("@/pages/AiToolboxPage"));
 const NotificationsPage      = lazy(() => import("@/pages/NotificationsPage"));
+const MaterialsPage          = lazy(() => import("@/pages/MaterialsPage"));
+const PublishPage            = lazy(() => import("@/pages/PublishPage"));
+const DataDashboardPage      = lazy(() => import("@/pages/DataDashboardPage"));
+
+import { supabase } from "@/db/supabase";
+import PlanGate from "@/components/PlanGate";
+import ForbiddenPage from "@/components/ForbiddenPage";
+import { Send, CheckCircle2 } from "lucide-react";
 
 // F-13: 页面级加载占位
 function PageLoader() {
@@ -67,33 +74,109 @@ function PageLoader() {
   );
 }
 
-// F-13: React Error Boundary
-interface EBState { hasError: boolean; error?: Error }
+// F-13: 增强型 React Error Boundary (支持重试、一键上报 error_logs)
+interface EBState {
+  hasError: boolean;
+  error?: Error;
+  reported: boolean;
+  reporting: boolean;
+}
+
 class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, EBState> {
   constructor(props: { children: ReactNode; fallback?: ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, reported: false, reporting: false };
   }
-  static getDerivedStateFromError(error: Error): EBState { return { hasError: true, error }; }
+
+  static getDerivedStateFromError(error: Error): Partial<EBState> {
+    return { hasError: true, error };
+  }
+
   componentDidCatch(error: Error, info: { componentStack: string }) {
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
+
+  handleReportError = async () => {
+    if (this.state.reported || this.state.reporting) return;
+    this.setState({ reporting: true });
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentUserId = sessionData?.session?.user?.id ?? null;
+
+      await supabase.from('error_logs').insert({
+        user_id: currentUserId,
+        source: 'frontend_error_boundary',
+        action: window.location.pathname,
+        error_code: 'REACT_RENDER_CRASH',
+        error_msg: this.state.error?.message ?? 'Unknown React Error',
+        meta: {
+          stack: this.state.error?.stack,
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          time: new Date().toISOString(),
+        },
+      });
+      this.setState({ reported: true, reporting: false });
+    } catch (e) {
+      console.warn('[ErrorBoundary] 错误日志上报失败:', e);
+      this.setState({ reported: true, reporting: false });
+    }
+  };
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: undefined, reported: false });
+  };
+
   render() {
     if (this.state.hasError) {
       return this.props.fallback ?? (
         <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
             <AlertTriangle className="w-7 h-7 text-destructive" />
           </div>
-          <div className="space-y-1.5">
-            <p className="font-semibold text-foreground">页面出错了</p>
-            <p className="text-sm text-muted-foreground max-w-xs text-pretty">
-              {this.state.error?.message ?? '发生了意外错误，请刷新重试'}
+          <div className="space-y-1.5 max-w-md">
+            <p className="font-semibold text-lg text-foreground">页面运行遇到了问题</p>
+            <p className="text-sm text-muted-foreground text-pretty">
+              {this.state.error?.message ?? '发生了意外错误，已为您保护会话安全。'}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-            <RefreshCw className="w-4 h-4 mr-1.5" />刷新页面
-          </Button>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Button variant="default" size="sm" onClick={this.handleReset} className="gap-1.5">
+              <RefreshCw className="w-4 h-4" /> 尝试恢复
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="gap-1.5">
+              刷新整个页面
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={this.state.reported || this.state.reporting}
+              onClick={this.handleReportError}
+              className="gap-1.5 text-xs"
+            >
+              {this.state.reported ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> 已上报技术团队
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" /> {this.state.reporting ? '正在上报...' : '一键上报异常'}
+                </>
+              )}
+            </Button>
+          </div>
+
+          {this.state.error?.stack && (
+            <details className="mt-4 text-left max-w-xl text-xs text-muted-foreground/80 bg-muted/30 p-3 rounded-lg border border-border/50 overflow-auto max-h-40">
+              <summary className="cursor-pointer font-mono mb-1 text-[11px] text-muted-foreground hover:text-foreground">
+                查看技术诊断信息
+              </summary>
+              <pre className="whitespace-pre-wrap font-mono text-[10px] leading-tight">
+                {this.state.error.stack}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }
@@ -166,15 +249,19 @@ function AppRoutes() {
                   <Route path="/task-queue" element={<TaskQueuePage />} />
                   <Route path="/export-formats" element={<ExportFormatsPage />} />
                   <Route path="/llm-cache" element={<LLMCachePage />} />
-                  {/* Phase 3 路由 */}
+                  {/* 权限门禁与高级功能 */}
                   <Route path="/team"              element={<TeamSpacePage />} />
                   <Route path="/open-api"          element={<OpenAPIPage />} />
                   <Route path="/data-feedback"     element={<DataFeedbackPage />} />
                   <Route path="/trending-patterns" element={<TrendingPatternsPage />} />
                   <Route path="/personalize"       element={<PersonalizePage />} />
-                  <Route path="/batch-create"      element={<BatchCreatePage />} />
+                  <Route path="/batch-create"      element={<PlanGate requiredPlan="pro" featureName="批量混剪与脚本矩阵"><BatchCreatePage /></PlanGate>} />
                   <Route path="/ai-toolbox"         element={<AiToolboxPage />} />
                   <Route path="/notifications"      element={<NotificationsPage />} />
+                  <Route path="/materials"          element={<MaterialsPage />} />
+                  <Route path="/publish"            element={<PublishPage />} />
+                  <Route path="/data-dashboard"     element={<DataDashboardPage />} />
+                  <Route path="/403"               element={<ForbiddenPage />} />
                   <Route path="/login" element={<Navigate to="/" replace />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
@@ -192,7 +279,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner richColors position="top-center" />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>

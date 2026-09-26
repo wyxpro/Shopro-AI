@@ -23,9 +23,21 @@ mcp = FastMCP("Shopro AI Video Generator MCP Server")
 STEP_API_KEY = os.getenv("VITE_STEP_API_KEY") or os.getenv("STEP_API_KEY")
 VECTRUST_API_KEY = os.getenv("VITE_VECTRUST_API_KEY") or os.getenv("VECTRUST_API_KEY")
 VECTRUST_BASE_URL = "https://draw.openai-next.com/v1"
+MCP_SERVER_KEY = os.getenv("MCP_API_KEY")
+
+def verify_auth(api_key: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """验证 MCP 工具调用的 API Key，防止未鉴权旁路调用"""
+    if MCP_SERVER_KEY:
+        if not api_key or api_key != MCP_SERVER_KEY:
+            return {"error": "unauthorized", "message": "Invalid or missing MCP_API_KEY"}
+    return None
 
 # Helper for unified tool call error wrapping
-async def handle_tool_call(tool_name: str, coro):
+async def handle_tool_call(tool_name: str, coro, api_key: Optional[str] = None):
+    auth_err = verify_auth(api_key)
+    if auth_err:
+        logger.warning(f"Unauthorized tool call attempted: {tool_name}")
+        return auth_err
     trace_id = os.urandom(8).hex()
     logger.info(f"Tool call started: {tool_name} | Trace ID: {trace_id}")
     start_time = asyncio.get_event_loop().time()

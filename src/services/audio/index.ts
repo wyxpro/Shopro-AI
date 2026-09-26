@@ -5,8 +5,7 @@
  */
 
 const SILICONFLOW_API_KEY =
-  (import.meta.env.VITE_SILICONFLOW_API_KEY as string) ||
-  "sk-fvaewxbnaadhaixwxkrprqdasapwbxkvbypruvquadzeaxyn";
+  (import.meta.env.VITE_SILICONFLOW_API_KEY as string) || "";
 
 const SILICONFLOW_BASE_URL =
   (import.meta.env.VITE_SILICONFLOW_BASE_URL as string) ||

@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { deductUserCredits } from '@/hooks/useCredits';
+import { deductUserCredits, refundGenerationCredits } from '@/hooks/useCredits';
+import { ensureCreditsForGeneration, openCreditsDialog, VIDEO_GENERATE_COST } from '@/lib/creditGuard';
 import { useDraft } from '@/hooks/useDraft';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { DouyinIcon, TikTokIcon, XiaohongshuIcon } from '@/components/ui/platform-icons';
 import type { ProductFormData, PromptConfig, Shot, MaterialItem, VideoProject } from '@/types/types';
 import { sendDeepSeekStreamRequest } from '@/lib/sse';
-import { extractVideoFirstFrame } from '@/lib/videoFrame';
+import { getVideoCoverImage } from '@/lib/videoFrame';
 
 // ── CR-05 跨平台适配配置 ────────────────────────────────────────────────────
 const PLATFORM_CONFIGS = [
@@ -1524,6 +1525,8 @@ function Step5Generate({ productData, promptConfig, shots, materials, onPrev, on
   const [stageLog, setStageLog] = useState<{ msg: string; pct: number; done: boolean; time: string }[]>([]);
   const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 管道触发标记：ai-assistant generate_video 已发起后，失败退款由边缘函数负责（防止前后端重复退款）
+  const pipelineTriggeredRef = useRef(false);
   const projectIdRef = useRef<string | null>(null);
 
   // 清理 Realtime 订阅
@@ -1582,7 +1585,8 @@ function Step5Generate({ productData, promptConfig, shots, materials, onPrev, on
       if (stageIdx >= PROGRESS_STAGES.length) {
         clearInterval(interval);
         const resultVideoUrl = 'https://www.w3schools.com/html/mov_bbb.mp4';
-        const coverFrame = (await extractVideoFirstFrame(resultVideoUrl)) || resultVideoUrl;
+        // 封面必须为图片（优先成片真实第一帧），绝不允许将 .mp4 地址写入 thumbnail_url
+        const coverFrame = await getVideoCoverImage(resultVideoUrl);
         const { data } = await supabase.from('video_projects')
           .update({
             status: 'completed',
@@ -1633,14 +1637,20 @@ function Step5Generate({ productData, promptConfig, shots, materials, onPrev, on
   const handleGenerate = async () => {
     if (!user) return;
 
-    // 校验与扣除积分 (生成视频每次消耗 10 积分)
+    // 统一积分守卫：余额 < 10 直接拦截（不进入 loading、不发起任何生成请求），并自动弹出充值弹窗
+    const guard = await ensureCreditsForGeneration(user.id, VIDEO_GENERATE_COST);
+    if (!guard.ok) return;
+
+    // 校验与扣除积分 (生成视频每次消耗 10 积分，deduct_credits RPC 原子扣费)
     const videoTitle = promptConfig.prompt_text?.trim() || productData.name?.trim() || '带货视频';
     const deductRes = await deductUserCredits(user.id, 10, `生成AI视频《${videoTitle}》`, 'video_generate');
     if (!deductRes.success) {
-      toast.error(deductRes.message || `积分不足！生成 AI 视频每次需消耗 10 积分（当前剩余 ${deductRes.creditsLeft} 积分），请充值！`, { duration: 5000 });
+      toast.error(deductRes.message || `积分不足（当前 ${deductRes.creditsLeft}，单次生成需 10），请充值后重试`, { duration: 6000 });
+      if (!deductRes.insufficientCredits) openCreditsDialog();
       return;
     }
-    toast.success(`⚡ 已成功扣除 10 积分（当前剩余 ${deductRes.creditsLeft} 积分），AI 视频生成任务已成功启动！`);
+    toast.success(`⚡ 已扣除 10 积分（当前剩余 ${deductRes.creditsLeft} 积分），AI 视频生成任务已成功启动！`);
+    pipelineTriggeredRef.current = false; // 新任务重置：同步阶段失败由本页退款，EF 侧失败由边缘函数退款
 
     setGenerating(true);
     setProgress(5); setStatusMsg('初始化任务...'); setStatusIcon('🔧');
@@ -1694,6 +1704,7 @@ function Step5Generate({ productData, promptConfig, shots, materials, onPrev, on
       supabase.functions.invoke('ai-assistant', {
         body: { action: 'generate_video', project_id: projectId, product: productData, prompt: promptConfig, shots, materials }
       }).catch(() => {}); // 异步触发，不阻塞前端
+      pipelineTriggeredRef.current = true; // 之后失败由 ai-assistant 侧统一回滚，避免重复退款
 
       // 5. 模拟后续进度（Realtime 实时推进）
       await simulateProgress(projectId);
@@ -1701,6 +1712,11 @@ function Step5Generate({ productData, promptConfig, shots, materials, onPrev, on
       toast.error('视频生成失败，请重试');
       setStatusMsg('生成失败');
       setGenerating(false);
+      // 失败回滚：仅在尚未触发 AI 管道时由本页退款（管道已触发则由边缘函数负责，防止重复退款）
+      if (user && !pipelineTriggeredRef.current) {
+        const res = await refundGenerationCredits(user.id, 10, '视频生成失败，自动退还积分');
+        if (res.success) toast.info('本次生成失败，已自动退还 10 积分');
+      }
     }
   };
 

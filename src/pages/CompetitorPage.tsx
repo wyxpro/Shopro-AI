@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import {
   TrendingUp, TrendingDown, RefreshCw, Plus, Eye,
   Heart, MessageCircle, Share2, Play, Bell, BellOff,
   BarChart3, Flame, Globe, ExternalLink, Trash2, Search,
-  AlertCircle, Sparkles, Clock, Wand2, Copy, Lightbulb, Loader2,
+  AlertCircle, Sparkles, Clock, Wand2, Copy, Lightbulb, Loader2, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -70,6 +71,8 @@ const MOCK_ACCOUNTS: CompetitorAccount[] = [
   { id: 'ca-001', platform: 'douyin', account_id: 'douyin_meizhuang', account_name: '小美美妆种草日记', category: '美妆护肤', follower_count: 3250000, is_monitoring: true, last_crawled_at: new Date().toISOString(), created_at: '2026-08-10T10:00:00Z' },
   { id: 'ca-002', platform: 'tiktok', account_id: 'tiktok_skincare', account_name: 'GlowSkin Official', category: '美妆护肤', follower_count: 1850000, is_monitoring: true, last_crawled_at: new Date().toISOString(), created_at: '2026-08-11T12:00:00Z' },
   { id: 'ca-003', platform: 'xiaohongshu', account_id: 'xhs_outfit', account_name: '穿搭指南小夏', category: '服装配饰', follower_count: 980000, is_monitoring: true, last_crawled_at: new Date().toISOString(), created_at: '2026-08-12T15:00:00Z' },
+  { id: 'ca-004', platform: 'kuaishou', account_id: 'ks_snack', account_name: '怀旧零食测评馆', category: '食品饮料', follower_count: 2160000, is_monitoring: true, last_crawled_at: new Date().toISOString(), created_at: '2026-09-02T09:30:00Z' },
+  { id: 'ca-005', platform: 'douyin', account_id: 'douyin_digital', account_name: '数码新品首发官', category: '数码3C', follower_count: 5480000, is_monitoring: true, last_crawled_at: new Date().toISOString(), created_at: '2026-09-05T18:20:00Z' },
 ];
 
 const MOCK_SNAPSHOTS: Record<string, CompetitorSnapshot[]> = {
@@ -82,6 +85,15 @@ const MOCK_SNAPSHOTS: Record<string, CompetitorSnapshot[]> = {
   ],
   'ca-003': [
     { id: 'sn-004', account_id: 'ca-003', video_id: 'v-301', title: '158小个子秋季显高穿搭模版', cover_url: null, play_count: 1650000, like_count: 135000, comment_count: 8800, share_count: 24000, duration: 25, style_tags: ['实用穿搭', '显高拉长'], hook_type: '痛点解决方案', is_trending: true, published_at: '2026-08-19T14:00:00Z', crawled_at: new Date().toISOString() },
+  ],
+  'ca-004': [
+    { id: 'sn-005', account_id: 'ca-004', video_id: 'v-401', title: '80后童年零食大横评！第3款泪目了', cover_url: null, play_count: 3120000, like_count: 268000, comment_count: 21600, share_count: 45000, duration: 46, style_tags: ['怀旧共鸣', '横评实测'], hook_type: '情绪共鸣开场', is_trending: true, published_at: '2026-09-08T19:30:00Z', crawled_at: new Date().toISOString() },
+    { id: 'sn-006', account_id: 'ca-004', video_id: 'v-402', title: '超市避雷指南：这5种零食配料表太脏', cover_url: null, play_count: 980000, like_count: 76000, comment_count: 5400, share_count: 18000, duration: 38, style_tags: ['干货科普', '避雷清单'], hook_type: '反差冲突', is_trending: false, published_at: '2026-09-10T11:00:00Z', crawled_at: new Date().toISOString() },
+  ],
+  'ca-005': [
+    { id: 'sn-007', account_id: 'ca-005', video_id: 'v-501', title: '新机深度实测：夜景成像真的强？', cover_url: null, play_count: 4680000, like_count: 356000, comment_count: 28900, share_count: 52000, duration: 55, style_tags: ['首发实测', '参数对比'], hook_type: '新机悬念', is_trending: true, published_at: '2026-09-12T20:00:00Z', crawled_at: new Date().toISOString() },
+    { id: 'sn-008', account_id: 'ca-005', video_id: 'v-502', title: '百元内耳机卷王之战，谁在裸泳', cover_url: null, play_count: 2150000, like_count: 142000, comment_count: 11800, share_count: 26000, duration: 42, style_tags: ['横评实测', '性价比'], hook_type: '冲突对立', is_trending: true, published_at: '2026-09-14T16:30:00Z', crawled_at: new Date().toISOString() },
+    { id: 'sn-009', account_id: 'ca-005', video_id: 'v-503', title: '发布会幕后：工程师拆解供应链真相', cover_url: null, play_count: 760000, like_count: 58000, comment_count: 4200, share_count: 9800, duration: 60, style_tags: ['行业揭秘', '深度内容'], hook_type: '幕后揭秘', is_trending: false, published_at: '2026-09-15T10:00:00Z', crawled_at: new Date().toISOString() },
   ],
 };
 
@@ -194,6 +206,7 @@ function AccountCard({
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function CompetitorPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<CompetitorAccount[]>([]);
   const [snapshots, setSnapshots] = useState<Record<string, CompetitorSnapshot[]>>({});
   const [loading, setLoading] = useState(true);
@@ -203,6 +216,8 @@ export default function CompetitorPage() {
   const [form, setForm] = useState({ platform: 'douyin', account_id: '', account_name: '', category: '' });
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState('');
+  // 账号总览默认仅展示前 3 个监控账号，可手动展开全部
+  const [showAllAccounts, setShowAllAccounts] = useState(false);
   const [tab, setTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('tab') || 'overview';
@@ -346,6 +361,7 @@ export default function CompetitorPage() {
   const filtered = accounts.filter(a =>
     !search || a.account_name.includes(search) || a.account_id.includes(search)
   );
+  const displayAccounts = search || showAllAccounts ? filtered : filtered.slice(0, 3);
 
   // 汇总爆款趋势图数据
   const trendData = Array.from({ length: 7 }, (_, i) => {
@@ -365,9 +381,10 @@ export default function CompetitorPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <Eye className="w-5 h-5 text-primary" />竞品监控系统
+            <Eye className="w-5 h-5 text-primary" />竞品爆款分析
+            <Badge className="text-[10px] bg-blue-500/15 text-blue-500 border border-blue-500/30">24h 实时感知</Badge>
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">P3-M01 · 实时追踪竞争对手爆款内容</p>
+          <p className="text-sm text-muted-foreground mt-0.5">抓取竞品爆款视频策略与对标拆解方案 · 一键生成对标脚本</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -431,7 +448,7 @@ export default function CompetitorPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map(a => (
+              {displayAccounts.map(a => (
                 <div key={a.id} onClick={() => setDetailAccount(a)} className="cursor-pointer">
                   <AccountCard
                     account={a}
@@ -444,6 +461,16 @@ export default function CompetitorPage() {
                 </div>
               ))}
             </div>
+          )}
+          {!loading && !search && filtered.length > 3 && (
+            <Button
+              size="sm" variant="outline"
+              className="mt-4 w-full h-8 gap-1.5 text-xs text-muted-foreground"
+              onClick={() => setShowAllAccounts(v => !v)}
+            >
+              {showAllAccounts ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showAllAccounts ? '收起监控账号' : `展开全部 ${filtered.length} 个监控账号（默认展示 3 个）`}
+            </Button>
           )}
         </TabsContent>
 
@@ -662,9 +689,21 @@ export default function CompetitorPage() {
                   ))}
                 </div>
               </div>
-              <Button className="w-full gap-1.5" onClick={() => { toast.success('内容方案已复制到剪贴板'); }}>
-                <Copy className="w-4 h-4" />复制完整方案
-              </Button>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1 gap-1.5" onClick={() => {
+                  navigator.clipboard.writeText(`${copyResult.title}\n\n${copyResult.script}`);
+                  toast.success('对标方案已复制到剪贴板！');
+                }}>
+                  <Copy className="w-4 h-4" />复制完整方案
+                </Button>
+                <Button className="flex-1 gap-1.5 bg-primary text-primary-foreground" onClick={() => {
+                  setCopyOpen(false);
+                  navigate('/script', { state: { competitorScript: copyResult.script, prompt: `${copyResult.title}\n${copyResult.script}` } });
+                  toast.success('已携带竞品对标方案进入带货脚本生成器！');
+                }}>
+                  <Wand2 className="w-4 h-4" />带入脚本创作
+                </Button>
+              </div>
             </div>
           ) : null}
         </DialogContent>

@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor / IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+*.d.ts.map
+tsconfig.tsbuildinfo
+tsconfig.app.tsbuildinfo
+tsconfig.node.tsbuildinfo
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# CodeBuddy / Tooling
+.codebuddy
+
+# MSW service worker —— 按 MSW 官方建议将 worker 脚本提交入库，
+# 保证新克隆无需重新生成即可直接启动（否则 dev server 回退返回 index.html 导致 SW 注册失败）。
+!public/mockServiceWorker.js
+
+# Vite config build artifacts
+/vite.config.js
+/vite.config.d.ts

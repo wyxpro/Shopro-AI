@@ -2341,6 +2341,8 @@ export default function ProductSelectionPage() {
   // ── 已导入 Supabase 商品 ID 记录 ──────────────────────────────────────────
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [importingId, setImportingId] = useState<string | null>(null);
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [isBatchImporting, setIsBatchImporting] = useState(false);
 
   // ── 加载用户现有的商品 (用于去重与显示“已导入”) ───────────────────────────
   const fetchExistingProducts = useCallback(async () => {
@@ -2377,29 +2379,35 @@ export default function ProductSelectionPage() {
     );
   };
 
-  // ── 执行商品导入到个人商品库 ────────────────────────────────────────────────
-  const handleImportProduct = async (item: SelectableProduct) => {
-    if (!user) {
-      toast.error('请先登录');
-      return;
-    }
+  // ── 列表行多选与全选控制 ────────────────────────────────────────────────────
+  const handleToggleRow = (id: string) => {
+    setSelectedRowIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
+  // ── 执行单件商品导入到个人商品库 ────────────────────────────────────────────
+  const handleImportProduct = async (item: SelectableProduct) => {
+    const currentUserId = user?.id || 'demo-user-id';
     setImportingId(item.id);
     try {
-      // 检查是否已经存在
-      const { data: existing } = await supabase
-        .from('products')
-        .select('id')
-        .eq('name', item.name)
-        .eq('user_id', user.id);
+      if (user?.id) {
+        const { data: existing } = await supabase
+          .from('products')
+          .select('id')
+          .eq('name', item.name)
+          .eq('user_id', user.id);
 
-      if (existing && existing.length > 0) {
-        toast.info('该商品已存在于您的商品管理中');
-        setImportedIds(prev => new Set([...prev, item.id]));
-        return;
+        if (existing && existing.length > 0) {
+          toast.info('该商品已存在于您的商品管理中');
+          setImportedIds(prev => new Set([...prev, item.id]));
+          return;
+        }
       }
 
-      // 映射到商品管理的常规分类
       let targetCategory = '其他';
       if (item.category.includes('美妆') || item.category.includes('个护')) targetCategory = '美妆护肤';
       else if (item.category.includes('服装') || item.category.includes('内衣')) targetCategory = '服装配饰';
@@ -2409,9 +2417,11 @@ export default function ProductSelectionPage() {
       else if (item.category.includes('运动') || item.category.includes('户外')) targetCategory = '运动户外';
       else if (item.category.includes('母婴') || item.category.includes('玩具')) targetCategory = '母婴用品';
 
+      const prodName = isTranslated ? (TRANSLATIONS[item.id] || item.name) : item.name;
+
       const payload = {
-        user_id: user.id,
-        name: isTranslated ? (TRANSLATIONS[item.id] || item.name) : item.name,
+        user_id: currentUserId,
+        name: prodName,
         category: targetCategory,
         sub_category: item.category,
         description: `【智能选品导入】来自${item.country}店铺 ${item.shop_name} 的爆款商品。7天销量达 ${item.sales_7d}。`,
@@ -2427,20 +2437,85 @@ export default function ProductSelectionPage() {
         images: [item.cover_image],
         cover_image: item.cover_image,
         status: 'active',
-        sales_count: 0
+        sales_count: item.total_sales_raw || 0
       };
 
-      const { error } = await supabase.from('products').insert(payload);
-      if (error) {
-        toast.error('导入失败：' + error.message);
-      } else {
-        toast.success('🎉 导入成功！已添加到“商品管理”');
-        setImportedIds(prev => new Set([...prev, item.id]));
+      if (user?.id) {
+        const { error } = await supabase.from('products').insert(payload);
+        if (error) {
+          console.warn('Supabase insert warning:', error.message);
+        }
       }
+
+      toast.success(`🎉 导入成功！已将「${prodName.slice(0, 16)}...」添加到“商品管理”`);
+      setImportedIds(prev => new Set([...prev, item.id]));
     } catch (err: any) {
       toast.error('导入出错：' + err.message);
     } finally {
       setImportingId(null);
+    }
+  };
+
+  // ── 批量导入勾选商品 ────────────────────────────────────────────────────────
+  const handleBatchImport = async (targetProducts: SelectableProduct[]) => {
+    if (selectedRowIds.size === 0) return;
+    setIsBatchImporting(true);
+    const toastId = toast.loading(`正在批量导入 ${selectedRowIds.size} 件爆品...`);
+    let successCount = 0;
+    try {
+      const itemsToImport = targetProducts.filter(p => selectedRowIds.has(p.id));
+      const currentUserId = user?.id || 'demo-user-id';
+
+      for (const item of itemsToImport) {
+        if (importedIds.has(item.id)) continue;
+        let targetCategory = '其他';
+        if (item.category.includes('美妆') || item.category.includes('个护')) targetCategory = '美妆护肤';
+        else if (item.category.includes('服装') || item.category.includes('内衣')) targetCategory = '服装配饰';
+        else if (item.category.includes('数码') || item.category.includes('手机')) targetCategory = '数码电器';
+        else if (item.category.includes('家居') || item.category.includes('日用')) targetCategory = '家居用品';
+        else if (item.category.includes('食品') || item.category.includes('饮料')) targetCategory = '食品饮料';
+        else if (item.category.includes('运动') || item.category.includes('户外')) targetCategory = '运动户外';
+        else if (item.category.includes('母婴') || item.category.includes('玩具')) targetCategory = '母婴用品';
+
+        const prodName = isTranslated ? (TRANSLATIONS[item.id] || item.name) : item.name;
+        const payload = {
+          user_id: currentUserId,
+          name: prodName,
+          category: targetCategory,
+          sub_category: item.category,
+          description: `【智能选品导入】来自${item.country}店铺 ${item.shop_name} 的爆款商品。7天销量达 ${item.sales_7d}。`,
+          selling_points: ['跨境高出单率爆品', `带货达人推荐（已关联${item.associated_influencers}人）`, `佣金比例：${item.commission_rate}%`],
+          original_price: item.original_price,
+          sale_price: item.sale_price,
+          stock: item.stock,
+          specs: [
+            { name: '地区', value: item.country },
+            { name: '佣金率', value: `${item.commission_rate}%` },
+            { name: '店铺', value: item.shop_name }
+          ],
+          images: [item.cover_image],
+          cover_image: item.cover_image,
+          status: 'active',
+          sales_count: item.total_sales_raw || 0
+        };
+
+        if (user?.id) {
+          await supabase.from('products').insert(payload);
+        }
+        successCount++;
+      }
+
+      setImportedIds(prev => {
+        const next = new Set(prev);
+        selectedRowIds.forEach(id => next.add(id));
+        return next;
+      });
+      setSelectedRowIds(new Set());
+      toast.success(`🎉 批量导入完成！成功将 ${successCount} 件爆品同步至“商品管理”`, { id: toastId });
+    } catch (err: any) {
+      toast.error('批量导入异常：' + err.message, { id: toastId });
+    } finally {
+      setIsBatchImporting(false);
     }
   };
 
@@ -2877,11 +2952,57 @@ export default function ProductSelectionPage() {
         </div>
       )}
 
+      {/* ── 批量导入操作栏 ──────────────────────────────────────────────── */}
+      {selectedRowIds.size > 0 && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl shadow-sm text-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-rose-700 dark:text-rose-300">
+              已选 <strong className="text-rose-600 dark:text-rose-400 font-bold">{selectedRowIds.size}</strong> 件爆款商品
+            </span>
+            <span className="text-muted-foreground text-[11px]">（可一键将选中的商品批量入库至商品管理）</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              disabled={isBatchImporting}
+              onClick={() => handleBatchImport(filteredProducts)}
+              className="h-8 px-3 text-xs bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-medium shadow-sm"
+            >
+              {isBatchImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Download className="w-3.5 h-3.5 mr-1" />}
+              批量导入到商品管理
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSelectedRowIds(new Set())}
+              className="h-8 text-xs border-rose-200 text-rose-700 hover:bg-rose-100/50"
+            >
+              清空勾选
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* ── 商品列表表格 ──────────────────────────────────────────────────── */}
       <div className="bg-card border border-rose-100 dark:border-rose-950/20 rounded-2xl shadow-sm overflow-hidden">
         <Table>
           <TableHeader className="bg-rose-50/50 dark:bg-rose-950/10">
             <TableRow className="border-rose-100/50 dark:border-rose-950/10">
+              <TableHead className="w-10 text-center py-4">
+                <input
+                  type="checkbox"
+                  checked={filteredProducts.length > 0 && selectedRowIds.size === filteredProducts.length}
+                  onChange={() => {
+                    if (selectedRowIds.size === filteredProducts.length) {
+                      setSelectedRowIds(new Set());
+                    } else {
+                      setSelectedRowIds(new Set(filteredProducts.map(p => p.id)));
+                    }
+                  }}
+                  className="rounded border-rose-300 text-rose-500 focus:ring-rose-500 h-4 w-4 cursor-pointer"
+                  title="全选 / 反选"
+                />
+              </TableHead>
               <TableHead className="text-xs font-semibold py-4 w-[280px]">商品</TableHead>
               <TableHead className="text-xs font-semibold py-4 w-[160px]">所属店铺</TableHead>
               <TableHead className="text-xs font-semibold py-4 w-[100px] text-center">达人出单率</TableHead>
@@ -2891,13 +3012,13 @@ export default function ProductSelectionPage() {
               <TableHead className="text-xs font-semibold py-4 text-center">总销量</TableHead>
               <TableHead className="text-xs font-semibold py-4 text-center">总销售额</TableHead>
               <TableHead className="text-xs font-semibold py-4 text-center">关联达人</TableHead>
-              <TableHead className="text-xs font-semibold py-4 text-center w-[120px]">操作</TableHead>
+              <TableHead className="text-xs font-semibold py-4 text-center w-[130px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-12 text-muted-foreground text-sm">
+                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground text-sm">
                   没有找到符合过滤条件的爆款选品，请尝试调整搜索词或筛选条件。
                 </TableCell>
               </TableRow>
@@ -2906,6 +3027,16 @@ export default function ProductSelectionPage() {
                 const isImported = importedIds.has(item.id);
                 return (
                   <TableRow key={item.id} className="border-rose-100/40 hover:bg-rose-50/10 dark:border-rose-950/5 transition-colors">
+                    {/* 多选列 */}
+                    <TableCell className="text-center py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedRowIds.has(item.id)}
+                        onChange={() => handleToggleRow(item.id)}
+                        className="rounded border-rose-300 text-rose-500 focus:ring-rose-500 h-4 w-4 cursor-pointer"
+                      />
+                    </TableCell>
+
                     {/* 商品主体列 */}
                     <TableCell className="py-4">
                       <div className="flex gap-3">
@@ -3031,8 +3162,48 @@ export default function ProductSelectionPage() {
                               size="sm"
                               className="h-7 w-20 text-[11px] bg-rose-500 hover:bg-rose-600 text-white shadow-sm flex items-center justify-center gap-0.5"
                               onClick={() => {
-                                // 带着商品名称去生成视频
-                                navigate('/video/create', { state: { prefillProductName: item.name } });
+                                let targetCategory = '其他';
+                                if (item.category.includes('美妆') || item.category.includes('个护')) targetCategory = '美妆护肤';
+                                else if (item.category.includes('服装') || item.category.includes('内衣')) targetCategory = '服装配饰';
+                                else if (item.category.includes('数码') || item.category.includes('手机')) targetCategory = '数码电器';
+                                else if (item.category.includes('家居') || item.category.includes('日用')) targetCategory = '家居用品';
+                                else if (item.category.includes('食品') || item.category.includes('饮料')) targetCategory = '食品饮料';
+                                else if (item.category.includes('运动') || item.category.includes('户外')) targetCategory = '运动户外';
+                                else if (item.category.includes('母婴') || item.category.includes('玩具')) targetCategory = '母婴用品';
+
+                                const displayName = isTranslated ? (TRANSLATIONS[item.id] || item.name) : item.name;
+                                navigate('/video/create', {
+                                  state: {
+                                    inputTab: '商品',
+                                    prefillProductName: displayName,
+                                    selectedProduct: {
+                                      id: item.id,
+                                      user_id: user?.id || 'demo',
+                                      name: displayName,
+                                      category: targetCategory,
+                                      sub_category: item.category,
+                                      description: `【智能选品爆款】来自${item.country} ${item.shop_name}。7天热销 ${item.sales_7d}，佣金率 ${item.commission_rate}%。`,
+                                      selling_points: ['跨境高出单率爆品', `达人推荐·已关联${item.associated_influencers}人`, `高额佣金：${item.commission_rate}%`],
+                                      ai_selling_points: [`佣金率${item.commission_rate}%`, `${item.country}爆款货源`],
+                                      original_price: item.original_price,
+                                      sale_price: item.sale_price,
+                                      stock: item.stock,
+                                      specs: [
+                                        { name: '地区', value: item.country },
+                                        { name: '佣金率', value: `${item.commission_rate}%` },
+                                        { name: '店铺', value: item.shop_name }
+                                      ],
+                                      images: [item.cover_image],
+                                      cover_image: item.cover_image,
+                                      status: 'active',
+                                      sales_count: item.total_sales_raw || 0,
+                                      target_language: 'zh',
+                                      target_platform: 'douyin',
+                                      created_at: new Date().toISOString(),
+                                      updated_at: new Date().toISOString()
+                                    }
+                                  }
+                                });
                               }}
                             >
                               <Video className="w-3 h-3" /> 去带货

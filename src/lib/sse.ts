@@ -78,7 +78,9 @@ export async function sendStreamRequest(options: StreamRequestOptions): Promise<
       if (error) onError(error);
       else onComplete();
     },
-    onAborted: () => console.log('请求已中断'),
+    onAborted: () => {
+      // 请求中断静默处理
+    },
   });
 
   try {
@@ -177,7 +179,8 @@ export async function sendDeepSeekStreamRequest(options: DeepSeekStreamOptions):
             model: modelName,
             messages,
             temperature: temperature ?? 0.7,
-            max_tokens: max_tokens ?? 1000,
+            // GLM-5.3-Flash 强制思维链，预留思考预算避免 max_tokens 被耗尽
+            max_tokens: Math.max(max_tokens ?? 1000, modelName.startsWith('glm') ? 4096 : 1000),
             stream: false,
           }),
           signal,
@@ -197,6 +200,44 @@ export async function sendDeepSeekStreamRequest(options: DeepSeekStreamOptions):
       }
       return false;
     };
+
+    // 0. GLM-5.3-Flash 直连（优先主通道：vite 代理 /glm-api → sophnet，密钥取自 .env 的 VITE_GLM_API_KEY）
+    const glmKey = (import.meta.env.VITE_GLM_API_KEY as string) || "";
+    if (glmKey) {
+      const glmBase = (import.meta.env.VITE_GLM_BASE_URL as string) || "/glm-api/v1";
+      const glmModel = (import.meta.env.VITE_GLM_MODEL as string) || "glm-5.3-flash";
+      const glmEndpoint = `${glmBase}/chat/completions`;
+      try {
+        const response = await fetch(glmEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${glmKey}`,
+          },
+          body: JSON.stringify({
+            model: glmModel,
+            messages,
+            temperature: temperature ?? 0.7,
+            // GLM-5.3-Flash 强制思维链（无法关闭）且 max_tokens 包含思考消耗，
+            // 传入 300 会被思考全部耗尽导致 0 正文输出，此处预留 4096 思考+输出预算
+            max_tokens: Math.max(max_tokens ?? 1000, 4096),
+            stream: true,
+          }),
+          signal,
+        });
+
+        if (response.ok && response.body) {
+          const success = await processStreamResponse(response);
+          if (success) return;
+        }
+
+        if (await tryNonStream(glmEndpoint, glmKey, glmModel)) return;
+      } catch (glmErr) {
+        console.warn("GLM API failed, falling back to dxkp:", glmErr);
+      }
+    } else {
+      console.warn("VITE_GLM_API_KEY 未配置，跳过前端直接调用 GLM");
+    }
 
     // 1. Try dxkp API endpoint
     try {
@@ -232,7 +273,11 @@ export async function sendDeepSeekStreamRequest(options: DeepSeekStreamOptions):
     }
 
     // 2. SiliconFlow API Fallback
-    const siliconKey = (import.meta.env.VITE_SILICONFLOW_API_KEY as string) || "sk-fvaewxbnaadhaixwxkrprqdasapwbxkvbypruvquadzeaxyn";
+    const siliconKey = (import.meta.env.VITE_SILICONFLOW_API_KEY as string) || "";
+    if (!siliconKey) {
+      console.warn("VITE_SILICONFLOW_API_KEY 未配置，跳过前端直接调用 SiliconFlow");
+      return;
+    }
     const sfEndpoints = [
       "https://api.siliconflow.cn/v1/chat/completions",
       "/siliconflow-api/v1/chat/completions",
@@ -271,22 +316,38 @@ export async function sendDeepSeekStreamRequest(options: DeepSeekStreamOptions):
     }
 
     if (!signal?.aborted) {
-      onError(new Error("提示词增强响应超时，请检查网络设置或稍后重试。"));
+      onError(new Error("提示词增强失败：GLM-5.3-Flash 及备用通道均不可用，请检查网络设置或稍后重试。"));
     }
   }
 
-  // Try Edge Function first
+  // Try Edge Function first（GLM-5.3-Flash 主通道，DeepSeek 备用）
   try {
     await sendStreamRequest({
-      functionUrl: `${SUPABASE_URL}/functions/v1/deepseek-v4-pro`,
+      functionUrl: `${SUPABASE_URL}/functions/v1/glm-5-3-flash`,
       requestBody: { messages, max_tokens, temperature },
       supabaseAnonKey: SUPABASE_ANON_KEY,
       onData,
       onComplete,
       onError: (err) => {
-        callDirectAPI().catch((fallbackErr) => {
-          onError(new Error(`Edge function failed (${err.message}) and fallback failed: ${fallbackErr.message}`));
-        });
+        try {
+          sendStreamRequest({
+            functionUrl: `${SUPABASE_URL}/functions/v1/deepseek-v4-pro`,
+            requestBody: { messages, max_tokens, temperature },
+            supabaseAnonKey: SUPABASE_ANON_KEY,
+            onData,
+            onComplete,
+            onError: (err2) => {
+              callDirectAPI().catch((fallbackErr) => {
+                onError(new Error(`Edge function failed (${err2.message}) and fallback failed: ${fallbackErr.message}`));
+              });
+            },
+            signal,
+          });
+        } catch (err2) {
+          callDirectAPI().catch((fallbackErr) => {
+            onError(new Error(`Edge function invocation failed and fallback failed: ${fallbackErr.message}`));
+          });
+        }
       },
       signal,
     });

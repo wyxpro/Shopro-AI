@@ -1,9 +1,36 @@
-// Wenxin proxy Edge Function re-routed to DeepSeek-V4-Pro
+// Wenxin proxy Edge Function re-routed to DeepSeek-V4-Pro (JWT Protected)
+// v2: 移除硬编码明文密钥（改由 Deno secrets 注入）+ 供应商切换日志与耗时审计
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+function logProviderSwitch(event: string, detail: Record<string, unknown>) {
+  console.log(JSON.stringify({
+    fn: 'wenxin-text-generation',
+    event,
+    ts: new Date().toISOString(),
+    ...detail,
+  }));
+}
+
+function streamResponse(body: ReadableStream, provider: string, model: string, latencyMs: number): Response {
+  return new Response(body, {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Content-Type-Options': 'nosniff',
+      'X-AI-Provider': provider,
+      'X-AI-Model': model,
+      'X-AI-Latency-Ms': String(latencyMs),
+    },
+  });
+}
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -12,6 +39,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
+  }
+
+  // 统一 JWT 鉴权
+  const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Missing Authorization header' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  const supabaseAuth = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+  );
+  const { data: authData, error: authErr } = await supabaseAuth.auth.getUser(token);
+  if (authErr || !authData?.user) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Invalid or expired token' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   let messages: Array<{ role: string; content: string }>;
@@ -37,49 +85,58 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  let apiKey = Deno.env.get('DEEPSEEK_API_KEY') || Deno.env.get('API_KEY') || '';
+  const apiKey = Deno.env.get('DEEPSEEK_API_KEY') || Deno.env.get('API_KEY') || '';
   const baseUrl = Deno.env.get('DEEPSEEK_BASE_URL') || 'https://ai.dxkp.com/v1';
+  const reqStart = Date.now();
 
   // 1. Try dxkp endpoint first
-  try {
-    const upstream = await fetch(
-      `${baseUrl}/chat/completions`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'DeepSeek-V4-Flash',
-          messages,
-          temperature,
-          max_tokens,
-          stream: true,
-        }),
-      }
-    );
+  if (apiKey) {
+    const nodeStart = Date.now();
+    try {
+      const upstream = await fetch(
+        `${baseUrl}/chat/completions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'DeepSeek-V4-Flash',
+            messages,
+            temperature,
+            max_tokens,
+            stream: true,
+          }),
+        }
+      );
 
-    if (upstream.ok && upstream.body) {
-      return new Response(upstream.body, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-          'X-Content-Type-Options': 'nosniff',
-        },
-      });
+      if (upstream.ok && upstream.body) {
+        const latency = Date.now() - nodeStart;
+        logProviderSwitch('provider_hit', { provider: 'dxkp', model: 'DeepSeek-V4-Flash', latency_ms: latency, total_ms: Date.now() - reqStart });
+        return streamResponse(upstream.body, 'dxkp', 'DeepSeek-V4-Flash', latency);
+      }
+      logProviderSwitch('provider_fallback', { provider: 'dxkp', status: upstream.status, latency_ms: Date.now() - nodeStart, next: 'siliconflow' });
+    } catch (dxkpErr) {
+      logProviderSwitch('provider_error', { provider: 'dxkp', error: String(dxkpErr), latency_ms: Date.now() - nodeStart, next: 'siliconflow' });
     }
-  } catch (dxkpErr) {
-    console.warn('dxkp fetch error:', dxkpErr);
+  } else {
+    logProviderSwitch('provider_skipped', { provider: 'dxkp', reason: 'missing DEEPSEEK_API_KEY' });
   }
 
-  // 2. SiliconFlow Fallback (High Availability Node)
-  let siliconKey = Deno.env.get('SILICONFLOW_API_KEY') || 'sk-fvaewxbnaadhaixwxkrprqdasapwbxkvbypruvquadzeaxyn';
+  // 2. SiliconFlow Fallback (High Availability Node) —— 密钥仅从 Deno secrets 读取，绝不硬编码兜底
+  const siliconKey = Deno.env.get('SILICONFLOW_API_KEY') || '';
+  if (!siliconKey) {
+    logProviderSwitch('all_providers_unavailable', { reason: 'missing SILICONFLOW_API_KEY and DEEPSEEK_API_KEY', total_ms: Date.now() - reqStart });
+    return new Response(
+      JSON.stringify({ error: 'AI 服务未配置密钥，请在 Supabase Secrets 中配置 DEEPSEEK_API_KEY / SILICONFLOW_API_KEY。' }),
+      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
   const siliconModels = ['deepseek-ai/DeepSeek-V4-Flash', 'deepseek-ai/DeepSeek-V3', 'Qwen/Qwen2.5-7B-Instruct'];
 
   for (const modelName of siliconModels) {
+    const nodeStart = Date.now();
     try {
       const sfUpstream = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
         method: 'POST',
@@ -97,21 +154,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
 
       if (sfUpstream.ok && sfUpstream.body) {
-        return new Response(sfUpstream.body, {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'X-Content-Type-Options': 'nosniff',
-          },
-        });
+        const latency = Date.now() - nodeStart;
+        logProviderSwitch('provider_hit', { provider: 'siliconflow', model: modelName, latency_ms: latency, total_ms: Date.now() - reqStart });
+        return streamResponse(sfUpstream.body, 'siliconflow', modelName, latency);
       }
+      logProviderSwitch('provider_fallback', { provider: 'siliconflow', model: modelName, status: sfUpstream.status, latency_ms: Date.now() - nodeStart });
     } catch (sfErr) {
-      console.warn(`SiliconFlow model ${modelName} error:`, sfErr);
+      logProviderSwitch('provider_error', { provider: 'siliconflow', model: modelName, error: String(sfErr), latency_ms: Date.now() - nodeStart });
     }
   }
 
+  logProviderSwitch('all_providers_failed', { total_ms: Date.now() - reqStart });
   return new Response(
     JSON.stringify({ error: 'DeepSeek text generation service unavailable.' }),
     { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

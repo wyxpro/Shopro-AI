@@ -1,25 +1,26 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { handleCorsPreflight, getCorsHeaders } from '../_shared/cors.ts';
+import { errorResponse, jsonResponse } from '../_shared/errors.ts';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+Deno.serve(async (req: Request): Promise<Response> => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
 
-serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  const corsHeaders = getCorsHeaders(req);
+  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
 
   let sessionId: string, code: string, mobile: string;
   try {
     const body = await req.json();
-    sessionId = body.sessionId;
-    code = body.code;
-    mobile = body.mobile;
+    sessionId = (body.sessionId || '').trim();
+    code = (body.code || '').trim();
+    mobile = (body.mobile || '').trim();
     if (!sessionId || !code || !mobile) throw new Error("Missing required fields");
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid request body: sessionId, code, mobile required" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return errorResponse("Invalid request body: sessionId, code, mobile required", 400, 400, req);
+  }
+
+  if (!/^1[3-9]\d{9}$/.test(mobile)) {
+    return errorResponse("请输入有效的 11 位中国大陆手机号码", 400, 4001, req);
   }
 
   const apiKey = Deno.env.get("INTEGRATIONS_API_KEY");

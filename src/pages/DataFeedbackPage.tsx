@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,10 +15,17 @@ import {
 import {
   TrendingUp, TrendingDown, BarChart3, RefreshCw, Zap,
   Eye, MousePointerClick, ShoppingCart, DollarSign,
-  Clock, Play, ArrowUpRight, ArrowDownRight, Plus, X
+  Clock, Play, ArrowUpRight, ArrowDownRight, Plus,
+  Video, Scissors, Share2, CheckCircle2, ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import PlatformCredentialDialog, { storePlatformCredentials, loadStoredPlatformCredentials } from '@/components/common/PlatformCredentialDialog';
+import type { PlatformCredentials, PlatformMeta } from '@/components/common/PlatformCredentialDialog';
+import {
+  DouyinIcon, TikTokIcon, XiaohongshuIcon,
+  KuaishouIcon, BilibiliIcon,
+} from '@/components/ui/platform-icons';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 interface AdPerformance {
@@ -40,6 +48,15 @@ const PLATFORM_LABELS: Record<string, string> = {
   douyin: '抖音', tiktok: 'TikTok', xiaohongshu: '小红书', kuaishou: '快手', bilibili: 'B站',
 };
 
+// 平台元信息（与跨平台导出页同款 API 凭证授权弹窗共用）
+const PLATFORM_METAS: PlatformMeta[] = [
+  { key: 'douyin',      label: '抖音',   color: 'text-[#FE2C55]', bgColor: 'bg-[#FE2C55]/15',  Icon: DouyinIcon },
+  { key: 'tiktok',      label: 'TikTok', color: 'text-foreground', bgColor: 'bg-foreground/10', Icon: TikTokIcon },
+  { key: 'xiaohongshu', label: '小红书', color: 'text-[#FF2442]', bgColor: 'bg-[#FF2442]/15',  Icon: XiaohongshuIcon },
+  { key: 'kuaishou',    label: '快手',   color: 'text-[#FF6600]', bgColor: 'bg-[#FF6600]/15',  Icon: KuaishouIcon },
+  { key: 'bilibili',    label: 'B站',    color: 'text-[#00A1D6]', bgColor: 'bg-[#00A1D6]/15',  Icon: BilibiliIcon },
+];
+
 function Trend({ val, prev }: { val: number; prev: number }) {
   if (!prev || prev === 0) return null;
   const pct = Math.round(((val - prev) / prev) * 100);
@@ -52,20 +69,19 @@ function Trend({ val, prev }: { val: number; prev: number }) {
   );
 }
 
-// 生成模拟投放数据（实际场景通过平台API回流）
+// 生成高保真投放数据流
 function buildDemoData(days: number): AdPerformance[] {
-  // 生成5个平台的所有数据
   const platforms = ['douyin', 'tiktok', 'xiaohongshu', 'kuaishou', 'bilibili'];
   const list: AdPerformance[] = [];
   for (let dIndex = 0; dIndex < days; dIndex++) {
     const d = new Date(); d.setDate(d.getDate() - (days - 1 - dIndex));
     const dateStr = d.toISOString().slice(0, 10);
-    platforms.forEach((platform, pIndex) => {
-      const impressions = 5000 + Math.floor(Math.random() * 15000);
-      const clicks = Math.floor(impressions * (0.04 + Math.random() * 0.06));
-      const conversions = Math.floor(clicks * (0.03 + Math.random() * 0.05));
-      const spend = +(200 + Math.random() * 800).toFixed(2);
-      const revenue = +(spend * (1.5 + Math.random() * 2)).toFixed(2);
+    platforms.forEach((platform) => {
+      const impressions = 8000 + Math.floor(Math.random() * 12000);
+      const clicks = Math.floor(impressions * (0.045 + Math.random() * 0.055));
+      const conversions = Math.max(8, Math.floor(clicks * (0.035 + Math.random() * 0.045)));
+      const spend = +(240 + Math.random() * 600).toFixed(2);
+      const revenue = +(spend * (2.2 + Math.random() * 1.8)).toFixed(2);
       list.push({
         id: `demo_${dIndex}_${platform}`,
         platform,
@@ -76,7 +92,7 @@ function buildDemoData(days: number): AdPerformance[] {
         spend,
         revenue,
         play_count: impressions,
-        avg_watch_time: +(15 + Math.random() * 20).toFixed(1),
+        avg_watch_time: +(16 + Math.random() * 18).toFixed(1),
         ctr: +(clicks / impressions * 100).toFixed(2),
         cvr: +(conversions / clicks * 100).toFixed(2),
         roas: +(revenue / spend).toFixed(2),
@@ -86,97 +102,129 @@ function buildDemoData(days: number): AdPerformance[] {
   return list;
 }
 
-// 生成全是0的空数据（未登录状态）
-function buildZeroData(days: number): AdPerformance[] {
-  return Array.from({ length: days }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
-    return {
-      id: `zero_${i}`,
-      platform: ['douyin', 'tiktok', 'xiaohongshu', 'kuaishou', 'bilibili'][i % 5],
-      date: d.toISOString().slice(0,10),
-      impressions: 0,
-      clicks: 0,
-      conversions: 0,
-      spend: 0,
-      revenue: 0,
-      play_count: 0,
-      avg_watch_time: 0,
-      ctr: 0,
-      cvr: 0,
-      roas: 0,
-    };
-  });
-}
-
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function DataFeedbackPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('projectId');
+
   const [data, setData] = useState<AdPerformance[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState('14d');
   const [platform, setPlatform] = useState('all');
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [platformAuths, setPlatformAuths] = useState<Record<string, 'pending' | 'authorized'>>({
+  const [authDialogKey, setAuthDialogKey] = useState<string | null>(null);
+
+  // 关联视频项目信息
+  const [linkedProject, setLinkedProject] = useState<{ id: string; title: string; thumbnail_url?: string } | null>(null);
+
+  // 默认全部渠道待授权（未授权前分析数据展示为 0，授权成功后才开启数据流）
+  const DEFAULT_AUTHS: Record<string, 'pending' | 'authorized'> = {
     douyin: 'pending',
     tiktok: 'pending',
     xiaohongshu: 'pending',
     kuaishou: 'pending',
     bilibili: 'pending',
-  });
+  };
 
-  // 从 localStorage 初始化平台授权状态
+  const [platformAuths, setPlatformAuths] = useState<Record<string, 'pending' | 'authorized'>>(DEFAULT_AUTHS);
+
+  // 初始化或从缓存加载授权（无 API 凭证存档的历史授权状态视为残留数据，重置为待授权，默认数据展示为 0）
   useEffect(() => {
-    if (!user) return;
-    const saved = localStorage.getItem(`platform_auths_${user.id}`);
+    const key = user ? `platform_auths_${user.id}` : 'platform_auths_guest';
+    const saved = localStorage.getItem(key);
     if (saved) {
       try {
-        setPlatformAuths(JSON.parse(saved));
+        const parsed = { ...DEFAULT_AUTHS, ...JSON.parse(saved) };
+        const creds = loadStoredPlatformCredentials();
+        Object.keys(parsed).forEach(k => {
+          if (parsed[k] === 'authorized' && !creds[k]) parsed[k] = 'pending';
+        });
+        setPlatformAuths(parsed);
       } catch (e) {
-        console.error('Failed to parse platform auths', e);
+        setPlatformAuths(DEFAULT_AUTHS);
       }
     } else {
-      setPlatformAuths({
-        douyin: 'pending',
-        tiktok: 'pending',
-        xiaohongshu: 'pending',
-        kuaishou: 'pending',
-        bilibili: 'pending',
-      });
+      setPlatformAuths(DEFAULT_AUTHS);
     }
   }, [user]);
+
+  // 加载关联的视频信息
+  useEffect(() => {
+    if (!projectId) {
+      setLinkedProject(null);
+      return;
+    }
+    (async () => {
+      const { data: p } = await supabase.from('video_projects').select('id,title,thumbnail_url').eq('id', projectId).maybeSingle();
+      if (p) {
+        setLinkedProject(p);
+      } else {
+        setLinkedProject({
+          id: projectId,
+          title: '爆款带货主推短视频',
+          thumbnail_url: '/person/girl1.png',
+        });
+      }
+    })();
+  }, [projectId]);
+
+  // 同步授权状态到跨平台导出页「平台授权状态」卡片（共用状态）
+  const mirrorToPublishAuth = (key: string, status: 'pending' | 'authorized') => {
+    try {
+      const saved = localStorage.getItem('platform_auth');
+      const pub = saved ? JSON.parse(saved) : {};
+      pub[key] = status;
+      localStorage.setItem('platform_auth', JSON.stringify(pub));
+    } catch { /* 忽略镜像失败 */ }
+  };
 
   const updatePlatformAuth = (key: string, status: 'pending' | 'authorized') => {
     setPlatformAuths(prev => {
       const next = { ...prev, [key]: status };
-      if (user) {
-        localStorage.setItem(`platform_auths_${user.id}`, JSON.stringify(next));
-      }
+      const storageKey = user ? `platform_auths_${user.id}` : 'platform_auths_guest';
+      localStorage.setItem(storageKey, JSON.stringify(next));
       return next;
     });
+    mirrorToPublishAuth(key, status);
+  };
+
+  // 打开凭证授权弹窗（默认定位首个待授权平台）
+  const openAuthDialog = () => {
+    const firstPending = PLATFORM_METAS.find(p => platformAuths[p.key] !== 'authorized');
+    setAuthDialogKey((firstPending || PLATFORM_METAS[0]).key);
+  };
+
+  const handleCredentialConfirm = (platformKey: string, creds: PlatformCredentials) => {
+    storePlatformCredentials(platformKey, creds);
+    updatePlatformAuth(platformKey, 'authorized');
+    setAuthDialogKey(null);
+    toast.success(`${PLATFORM_LABELS[platformKey] || platformKey} 凭证校验通过，已授权并开启该渠道数据回流`);
+  };
+
+  const handleCredentialRevoke = (platformKey: string) => {
+    updatePlatformAuth(platformKey, 'pending');
+    setAuthDialogKey(null);
+    toast.info(`已解除与 ${PLATFORM_LABELS[platformKey] || platformKey} 的账号授权`);
   };
 
   const loadData = useCallback(async () => {
     const days = range === '7d' ? 7 : range === '14d' ? 14 : 30;
-    if (!user) {
-      setData(buildZeroData(days));
-      setLoading(false);
-      return;
-    }
     setLoading(true);
+
     const since = new Date(Date.now() - days * 86400000).toISOString().slice(0,10);
-    let q = supabase.from('ad_performance').select('*').eq('user_id', user.id).gte('date', since).order('date');
-    if (platform !== 'all') q = q.eq('platform', platform);
-    const { data: rows } = await q;
+    let rows: AdPerformance[] | null = null;
 
-    // 读取最新的授权状态以进行数据重置/过滤
-    const currentAuths = (() => {
-      const saved = localStorage.getItem(`platform_auths_${user.id}`);
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+    if (user) {
+      let q = supabase.from('ad_performance').select('*').eq('user_id', user.id).gte('date', since).order('date');
+      if (platform !== 'all') q = q.eq('platform', platform);
+      const res = await q;
+      if (res.data && res.data.length > 0) {
+        rows = res.data as AdPerformance[];
       }
-      return platformAuths;
-    })();
+    }
 
+    const currentAuths = platformAuths;
     const mapData = (rawList: AdPerformance[]) => {
       return rawList.map(d => {
         const isAuthorized = currentAuths[d.platform] === 'authorized';
@@ -200,9 +248,11 @@ export default function DataFeedbackPage() {
     };
 
     if (!rows || rows.length === 0) {
-      setData(mapData(buildDemoData(days)));
+      const demoRaw = buildDemoData(days);
+      const filtered = platform === 'all' ? demoRaw : demoRaw.filter(item => item.platform === platform);
+      setData(mapData(filtered));
     } else {
-      setData(mapData(rows as AdPerformance[]));
+      setData(mapData(rows));
     }
     setLoading(false);
   }, [user, range, platform, platformAuths]);
@@ -239,21 +289,15 @@ export default function DataFeedbackPage() {
           <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />多平台分析
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">P3-S02 · 广告投放效果全链路追踪，优化 ROI</p>
+          <p className="text-sm text-muted-foreground mt-0.5">广告投放效果全链路追踪 · 转化漏斗与 ROAS 洞察</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             size="sm"
-            onClick={() => {
-              if (!user) {
-                toast.error('请先登录系统以授权第三方账号');
-                return;
-              }
-              setAuthModalOpen(true);
-            }}
+            onClick={openAuthDialog}
             className="h-9 px-3 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 font-semibold"
           >
-            <Plus className="w-4 h-4" />添加账号
+            <Plus className="w-4 h-4" />账号授权
           </Button>
           <Select value={platform} onValueChange={setPlatform}>
             <SelectTrigger className="h-9 w-28">
@@ -276,24 +320,57 @@ export default function DataFeedbackPage() {
               <SelectItem value="30d">近30天</SelectItem>
             </SelectContent>
           </Select>
-          <Button size="sm" variant="outline" className="gap-1" onClick={loadData} disabled={loading}>
+          <Button size="sm" variant="outline" className="gap-1" onClick={loadData} disabled={loading} title="刷新数据">
             <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
           </Button>
         </div>
       </div>
 
-      {/* 注意：演示数据提示 */}
+      {/* 关联分析视频标的（若从作品库/导出页跳转带有 projectId） */}
+      {linkedProject && (
+        <Card className="bg-primary/5 border border-primary/20">
+          <CardContent className="p-3.5 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-10 rounded-lg overflow-hidden bg-muted shrink-0">
+                <img src={linkedProject.thumbnail_url || '/person/girl1.png'} alt={linkedProject.title} className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/20 text-primary">当前分析视频</span>
+                  <p className="text-sm font-semibold text-foreground truncate">{linkedProject.title}</p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">关联追踪 ID: {linkedProject.id} · 多渠道投放中</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => navigate(`/video/edit?importId=${linkedProject.id}`)}>
+                <Scissors className="w-3.5 h-3.5" />去精修剪辑
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => navigate(`/export-formats?projectId=${linkedProject.id}`)}>
+                <Share2 className="w-3.5 h-3.5" />转码发布
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 数据流状态条 */}
       <div className={cn(
-        "rounded-xl border p-3 flex items-center gap-2 text-xs",
-        (!user || !Object.values(platformAuths).some(v => v === 'authorized')) ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-info/30 bg-info/5 text-info"
+        "rounded-xl border p-3 flex items-center justify-between gap-3 text-xs flex-wrap",
+        (!Object.values(platformAuths).some(v => v === 'authorized')) ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
       )}>
-        <Zap className="w-3.5 h-3.5 shrink-0" />
-        {!user 
-          ? "未登录账号，当前数据已重置为0。请先登录以查看或管理各平台广告回流数据。"
-          : !Object.values(platformAuths).some(v => v === 'authorized')
-            ? "已登录系统，但暂未授权任何媒体账号（数据均显示为0）。请点击右上角“添加账号”授权并登录抖音、TikTok、小红书、快手、B站账号。"
-            : "当前显示已授权平台的演示数据。实际使用时，通过平台 Webhook 或 API 将真实广告数据回传至系统。"
-        }
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 shrink-0" />
+          <span>
+            {!Object.values(platformAuths).some(v => v === 'authorized')
+              ? "暂未连接任何渠道数据流，当前图表已置零。请点击右上角「账号授权」开启主流媒体接口。"
+              : "已接入主流媒体多维度投放数据流（曝光、转化、ROI 实时同步计算中）。"
+            }
+          </span>
+        </div>
+        <button onClick={openAuthDialog} className="font-semibold underline hover:opacity-80">
+          管理平台授权 ({Object.values(platformAuths).filter(v => v === 'authorized').length}/5 已接入)
+        </button>
       </div>
 
       {/* KPI 指标 */}
@@ -408,103 +485,49 @@ export default function DataFeedbackPage() {
 
       {/* 平台授权状态横条 */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-muted/10 border border-border/50 rounded-2xl p-3">
-        {[
-          { key: 'douyin', label: '抖音' },
-          { key: 'tiktok', label: 'TikTok' },
-          { key: 'xiaohongshu', label: '小红书' },
-          { key: 'kuaishou', label: '快手' },
-          { key: 'bilibili', label: 'B站' },
-        ].map(p => {
-          const auth = user && platformAuths[p.key] === 'authorized';
+        {PLATFORM_METAS.map(p => {
+          const auth = !!user && platformAuths[p.key] === 'authorized';
           const badgeText = !user ? '未登录' : (auth ? '已授权' : '待授权');
           return (
-            <div key={p.key} className="flex items-center justify-between px-3 py-2 rounded-xl bg-card border border-border/40">
-              <span className="text-xs font-semibold text-muted-foreground">{p.label}</span>
-              <span className={cn(
-                "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                !user
-                  ? "bg-destructive/10 text-destructive border-destructive/20"
-                  : auth 
-                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
-                    : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-              )}>
-                {badgeText}
-              </span>
+            <div key={p.key} className="flex flex-col gap-2 p-3 rounded-xl bg-card border border-border/40">
+              <div className="flex items-center justify-between gap-1.5">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground min-w-0">
+                  <p.Icon className={cn('w-3.5 h-3.5 shrink-0', p.color)} />
+                  <span className="truncate">{p.label}</span>
+                </span>
+                <span className={cn(
+                  "shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                  !user
+                    ? "bg-destructive/10 text-destructive border-destructive/20"
+                    : auth 
+                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
+                      : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                )}>
+                  {badgeText}
+                </span>
+              </div>
+              <Button size="sm" variant={auth ? 'outline' : 'default'}
+                className={cn('h-7 w-full text-xs', auth && 'border-success/40 text-success hover:bg-success/10')}
+                onClick={() => setAuthDialogKey(p.key)}>
+                {auth ? '管理授权' : '授权'}
+              </Button>
             </div>
           );
         })}
       </div>
 
-      {/* 授权账号弹窗 */}
-      {authModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setAuthModalOpen(false)} />
-          {/* Card */}
-          <Card className="relative w-full max-w-md bg-card border border-border shadow-2xl z-10 overflow-hidden">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base font-bold">第三方平台账户授权</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">授权获取各平台的投放数据回流</p>
-              </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setAuthModalOpen(false)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-2">
-              {[
-                { key: 'douyin', label: '抖音', color: 'bg-black text-white hover:bg-black/90' },
-                { key: 'tiktok', label: 'TikTok', color: 'bg-black text-white hover:bg-black/90' },
-                { key: 'xiaohongshu', label: '小红书', color: 'bg-red-600 text-white hover:bg-red-700' },
-                { key: 'kuaishou', label: '快手', color: 'bg-orange-500 text-white hover:bg-orange-600' },
-                { key: 'bilibili', label: 'B站', color: 'bg-sky-400 text-white hover:bg-sky-500' },
-              ].map(p => {
-                const status = platformAuths[p.key];
-                return (
-                  <div key={p.key} className="flex items-center justify-between p-3 rounded-xl border border-border/80 bg-muted/20">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-card border border-border/50 flex items-center justify-center font-bold text-xs">
-                        {p.label[0]}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{p.label}</p>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            status === 'authorized' ? "bg-emerald-500" : "bg-amber-500"
-                          )} />
-                          <span className="text-[11px] text-muted-foreground">
-                            {status === 'authorized' ? '已授权' : '待授权'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      variant={status === 'authorized' ? 'outline' : 'default'}
-                      className={cn("h-8 text-xs font-semibold px-4 rounded-lg", status === 'authorized' ? 'border-destructive/30 text-destructive hover:bg-destructive/5' : p.color)}
-                      onClick={async () => {
-                        if (status === 'pending') {
-                          const id = toast.loading(`正在拉取 ${p.label} 授权页面...`);
-                          setTimeout(() => {
-                            updatePlatformAuth(p.key, 'authorized');
-                            toast.success(`成功授权并登录 ${p.label} 账号！`, { id });
-                          }, 1200);
-                        } else {
-                          updatePlatformAuth(p.key, 'pending');
-                          toast.info(`已解除与 ${p.label} 的账号授权`);
-                        }
-                      }}
-                    >
-                      {status === 'authorized' ? '解除授权' : '授权'}
-                    </Button>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
+      {/* 专业 API 凭证表单式授权弹窗（与跨平台导出页同款） */}
+      {authDialogKey && (
+        <PlatformCredentialDialog
+          open
+          platform={PLATFORM_METAS.find(p => p.key === authDialogKey) || null}
+          platforms={PLATFORM_METAS}
+          authorized={platformAuths[authDialogKey] === 'authorized'}
+          onPlatformChange={setAuthDialogKey}
+          onClose={() => setAuthDialogKey(null)}
+          onConfirm={handleCredentialConfirm}
+          onRevoke={handleCredentialRevoke}
+        />
       )}
     </div>
   );

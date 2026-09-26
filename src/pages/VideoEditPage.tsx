@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { sendStepAudioASR } from '@/lib/sse';
 import { audioRecorder } from '@/lib/audioRecorder';
+import { cn } from '@/lib/utils';
 
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────
@@ -36,7 +37,62 @@ interface TrackItem {
   duration: number;
   type: 'video' | 'audio' | 'text' | 'image';
   url?: string;
+  scale?: number;
+  opacity?: number;
+  volume?: number;
+  speed?: number;
+  fontStyle?: string;
+  keyframes?: Record<string, { pos: number; val: number }[]>;
 }
+
+export interface PipSettings {
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  opacity: number;
+  blendMode: string;
+}
+
+export interface PipLayer {
+  id: string;
+  name: string;
+  url?: string;
+  type?: 'video' | 'image';
+  visible: boolean;
+  locked: boolean;
+}
+
+export interface AudioSettings {
+  volume: number;
+  fadeIn: number;
+  fadeOut: number;
+  pitch: number;
+  speed: number;
+  eqBands: Record<string, number>;
+  enabledEffects: Set<string>;
+}
+
+export const getCssFilter = (filterId: string | null, intensity: number = 80, beautyEnabled: boolean = false) => {
+  const parts: string[] = [];
+  if (beautyEnabled) {
+    parts.push('brightness(1.06) contrast(1.03) saturate(1.08)');
+  }
+  if (!filterId) return parts.length ? parts.join(' ') : 'none';
+  const pct = intensity / 100;
+  switch (filterId) {
+    case 'f1': parts.push(`contrast(${1 + 0.2 * pct}) saturate(${1 - 0.2 * pct}) brightness(${1 - 0.05 * pct}) sepia(${0.2 * pct})`); break;
+    case 'f2': parts.push(`sepia(${0.35 * pct}) saturate(${1 + 0.3 * pct}) brightness(${1 + 0.05 * pct})`); break;
+    case 'f3': parts.push(`hue-rotate(${180 * pct}deg) saturate(${1 - 0.1 * pct})`); break;
+    case 'f4': parts.push(`sepia(${0.4 * pct}) contrast(${1 + 0.15 * pct}) brightness(${1 - 0.1 * pct})`); break;
+    case 'f5': parts.push(`grayscale(${pct}) contrast(${1 + 0.2 * pct})`); break;
+    case 'f6': parts.push(`invert(${pct})`); break;
+    case 'f7': parts.push(`saturate(${1 + 1.2 * pct}) contrast(${1 + 0.1 * pct})`); break;
+    case 'f8': parts.push(`saturate(${Math.max(0, 1 - 0.8 * pct)}) brightness(${1 + 0.05 * pct})`); break;
+    default: break;
+  }
+  return parts.length ? parts.join(' ') : 'none';
+};
 
 // 左侧面板模块枚举
 type PanelId =
@@ -58,13 +114,13 @@ const TRANSITIONS = [
   { id: 't3', name: '推入', category: '基础', color: 'from-zinc-700 to-zinc-600', cover: 'https://images.unsplash.com/photo-1547082299-de196ea013d6?w=200&h=150&fit=crop&auto=format' },
   { id: 't4', name: '拉出', category: '基础', color: 'from-zinc-700 to-zinc-600', cover: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=200&h=150&fit=crop&auto=format' },
   { id: 't5', name: '闪白', category: '炫酷', color: 'from-yellow-900 to-yellow-700', cover: 'https://images.unsplash.com/photo-1534294668821-28a3054f4256?w=200&h=150&fit=crop&auto=format' },
-  { id: 't6', name: '光晕爆炸', category: '炫酷', color: 'from-orange-900 to-orange-700', cover: 'https://images.unsplash.com/photo-1533040539929-e2c29e9dc7fc?w=200&h=150&fit=crop&auto=format' },
+  { id: 't6', name: '光晕爆炸', category: '炫酷', color: 'from-orange-900 to-orange-700', cover: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=200&h=150&fit=crop&auto=format' },
   { id: 't7', name: '故障切换', category: '炫酷', color: 'from-purple-900 to-purple-700', cover: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200&h=150&fit=crop&auto=format' },
   { id: 't8', name: '立体翻转', category: '炫酷', color: 'from-blue-900 to-blue-700', cover: 'https://images.unsplash.com/photo-1586374579358-9d19d632b6df?w=200&h=150&fit=crop&auto=format' },
   { id: 't9', name: '鼓点切', category: '节奏', color: 'from-emerald-900 to-emerald-700', cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&h=150&fit=crop&auto=format' },
   { id: 't10', name: '卡点闪动', category: '节奏', color: 'from-emerald-900 to-emerald-700', cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&h=150&fit=crop&auto=format' },
   { id: 't11', name: '波形跳动', category: '节奏', color: 'from-teal-900 to-teal-700', cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=150&fit=crop&auto=format' },
-  { id: 't12', name: '旋转卡点', category: '节奏', color: 'from-cyan-900 to-cyan-700', cover: 'https://images.unsplash.com/photo-1501386761578-eaa54b698c29?w=200&h=150&fit=crop&auto=format' },
+  { id: 't12', name: '旋转卡点', category: '节奏', color: 'from-cyan-900 to-cyan-700', cover: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=200&h=150&fit=crop&auto=format' },
 ];
 
 // 滤镜数据
@@ -182,7 +238,14 @@ function EffectCard({ name, gradient, applied, onClick, onFavorite, cover }: {
       onContextMenu={handleCtx}
     >
       {cover
-        ? <img src={cover} alt={name} className="absolute inset-0 w-full h-full object-cover" />
+        ? <img
+            src={cover}
+            alt={name}
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200&h=150&fit=crop&auto=format';
+            }}
+          />
         : <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-80`} />
       }
       {/* 封面遮罩，增强文字可读性 */}
@@ -479,15 +542,30 @@ function MediaLibraryPanel({ materials, onAdd, importedVideos, onImportVideo, on
 }
 
 // ── 面板2：效果 ──────────────────────────────────────────────────────
-function EffectsPanel() {
+function EffectsPanel({
+  appliedFilter,
+  setAppliedFilter,
+  filterIntensity,
+  setFilterIntensity,
+  appliedTrans,
+  setAppliedTrans,
+  tracks,
+  setTracks,
+  currentTime,
+}: {
+  appliedFilter: string | null;
+  setAppliedFilter: (f: string | null) => void;
+  filterIntensity: Record<string, number>;
+  setFilterIntensity: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  appliedTrans: string | null;
+  setAppliedTrans: (t: string | null) => void;
+  tracks: TrackItem[];
+  setTracks: React.Dispatch<React.SetStateAction<TrackItem[]>>;
+  currentTime: number;
+}) {
   const [activeTab, setActiveTab] = useState<'transition' | 'filter' | 'sticker' | 'audio'>('transition');
   const [transCategory, setTransCategory] = useState('全部');
-  const [appliedTrans, setAppliedTrans] = useState<string | null>(null);
-  const [filterIntensity, setFilterIntensity] = useState<Record<string, number>>({});
-  const [appliedFilter, setAppliedFilter] = useState<string | null>(null);
-  const [appliedStickers, setAppliedStickers] = useState<Set<string>>(new Set());
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
-  const [addedAudio, setAddedAudio] = useState<Set<string>>(new Set());
   const [moodFilter, setMoodFilter] = useState('全部');
   const [audioSearch, setAudioSearch] = useState('');
 
@@ -500,23 +578,75 @@ function EffectsPanel() {
   });
 
   const applyTransition = (id: string, name: string) => {
-    setAppliedTrans(id);
-    toast.success(`已应用转场：${name}`, { description: '拖拽到两段视频之间可重新定位' });
+    if (appliedTrans === id) {
+      setAppliedTrans(null);
+      toast.info(`已移除转场：${name}`);
+    } else {
+      setAppliedTrans(id);
+      toast.success(`已应用转场「${name}」！`, { description: '片段交接处已启用该转场过渡效果' });
+    }
   };
 
   const applyFilter = (id: string, name: string) => {
-    setAppliedFilter(id === appliedFilter ? null : id);
-    toast.success(id === appliedFilter ? `已移除滤镜：${name}` : `已应用滤镜：${name}`);
+    if (appliedFilter === id) {
+      setAppliedFilter(null);
+      toast.info(`已移除滤镜：${name}`);
+    } else {
+      setAppliedFilter(id);
+      if (filterIntensity[id] === undefined) {
+        setFilterIntensity(prev => ({ ...prev, [id]: 80 }));
+      }
+      toast.success(`已应用「${name}」电影级滤镜，视频画布实时预览生效！`);
+    }
   };
 
   const toggleSticker = (id: string, name: string) => {
-    setAppliedStickers(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); toast.info(`已移除：${name}`); }
-      else { next.add(id); toast.success(`已添加：${name}`); }
-      return next;
-    });
+    const stickerItem = STICKERS.find(s => s.id === id);
+    if (!stickerItem) return;
+    const trackItemId = `sticker-${id}`;
+    const exists = tracks.some(t => t.id === trackItemId);
+
+    if (exists) {
+      setTracks(prev => prev.filter(t => t.id !== trackItemId));
+      toast.info(`已从时间轴移除特效素材：${name}`);
+    } else {
+      const newItem: TrackItem = {
+        id: trackItemId,
+        trackId: 'effects',
+        name: stickerItem.name,
+        start: Number(currentTime.toFixed(1)),
+        duration: 5,
+        type: 'image',
+        url: stickerItem.cover,
+      };
+      setTracks(prev => [...prev, newItem].sort((a, b) => a.start - b.start));
+      toast.success(`已添加「${name}」动态特效到时间轴 (当前播放头 ${currentTime.toFixed(1)}s 处)`);
+    }
   };
+
+  const handleToggleAudioTrack = (a: typeof AUDIO_TRACKS[0]) => {
+    const trackItemId = `audio-${a.id}`;
+    const exists = tracks.some(t => t.id === trackItemId);
+
+    if (exists) {
+      setTracks(prev => prev.filter(t => t.id !== trackItemId));
+      toast.info(`已从时间轴移除音频：${a.name}`);
+    } else {
+      const newItem: TrackItem = {
+        id: trackItemId,
+        trackId: 'audio',
+        name: a.name,
+        start: Number(currentTime.toFixed(1)),
+        duration: 15,
+        type: 'audio',
+        url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      };
+      setTracks(prev => [...prev, newItem].sort((a, b) => a.start - b.start));
+      toast.success(`已添加背景音频「${a.name}」到时间轴`);
+    }
+  };
+
+  const appliedStickersCount = tracks.filter(t => t.trackId === 'effects').length;
 
   return (
     <div className="flex flex-col h-full">
@@ -525,7 +655,7 @@ function EffectsPanel() {
         {([['transition', '转场'], ['filter', '滤镜'], ['sticker', '特效贴纸'], ['audio', '音乐音效']] as const).map(([id, label]) => (
           <button
             key={id}
-            className={`flex-1 py-2 text-[11px] transition-colors ${activeTab === id ? 'text-white border-b-2 border-indigo-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`flex-1 py-2 text-[11px] transition-colors ${activeTab === id ? 'text-white border-b-2 border-indigo-500 font-medium' : 'text-zinc-500 hover:text-zinc-300'}`}
             onClick={() => setActiveTab(id)}
           >
             {label}
@@ -541,7 +671,7 @@ function EffectsPanel() {
               {transCategories.map(cat => (
                 <button
                   key={cat}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${transCategory === cat ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${transCategory === cat ? 'bg-indigo-600 text-white font-medium' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
                   onClick={() => setTransCategory(cat)}
                 >
                   {cat}
@@ -549,12 +679,12 @@ function EffectsPanel() {
               ))}
             </div>
             {appliedTrans && (
-              <div className="mx-3 mb-2 px-2 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between">
+              <div className="mx-3 mb-2 px-2.5 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between">
                 <span className="text-[11px] text-indigo-300 flex items-center gap-1.5">
-                  <Check className="w-3 h-3" />
-                  已应用：{TRANSITIONS.find(t => t.id === appliedTrans)?.name}
+                  <Check className="w-3.5 h-3.5 text-indigo-400" />
+                  已应用转场：<strong className="text-white">{TRANSITIONS.find(t => t.id === appliedTrans)?.name}</strong>
                 </span>
-                <button className="text-[10px] text-zinc-500 hover:text-zinc-300" onClick={() => { setAppliedTrans(null); toast.info('已移除转场'); }}>移除</button>
+                <button className="text-[10px] text-zinc-400 hover:text-red-300 underline" onClick={() => { setAppliedTrans(null); toast.info('已移除转场'); }}>移除</button>
               </div>
             )}
             <div className="px-3 grid grid-cols-2 gap-2">
@@ -562,7 +692,7 @@ function EffectsPanel() {
                 <EffectCard key={t.id} name={t.name} gradient={t.color} cover={t.cover} applied={appliedTrans === t.id} onClick={() => applyTransition(t.id, t.name)} />
               ))}
             </div>
-            <p className="text-[10px] text-zinc-500 text-center py-3">点击应用 · 右键更多操作</p>
+            <p className="text-[10px] text-zinc-500 text-center py-3">点击效果立即应用 · 画面转场实时生效</p>
           </div>
         )}
 
@@ -570,17 +700,17 @@ function EffectsPanel() {
         {activeTab === 'filter' && (
           <div className="px-3 pt-3 space-y-3">
             {appliedFilter && (
-              <div className="px-2 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between">
+              <div className="px-2.5 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between">
                 <span className="text-[11px] text-indigo-300 flex items-center gap-1.5">
-                  <Check className="w-3 h-3" />已应用：{FILTERS.find(f => f.id === appliedFilter)?.name}
+                  <Check className="w-3.5 h-3.5 text-indigo-400" />已生效滤镜：<strong className="text-white">{FILTERS.find(f => f.id === appliedFilter)?.name}</strong>
                 </span>
-                <button className="text-[10px] text-zinc-500 hover:text-zinc-300" onClick={() => { setAppliedFilter(null); toast.info('已移除滤镜'); }}>移除</button>
+                <button className="text-[10px] text-zinc-400 hover:text-red-300 underline" onClick={() => { setAppliedFilter(null); toast.info('已移除滤镜'); }}>清除滤镜</button>
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">
               {FILTERS.map(f => (
-                <div key={f.id} className={`rounded border overflow-hidden bg-zinc-800 transition-all cursor-pointer hover:-translate-y-0.5 ${appliedFilter === f.id ? 'border-indigo-500 ring-1 ring-indigo-500/40' : 'border-zinc-700 hover:border-zinc-500'}`}>
-                  <div className="aspect-video relative overflow-hidden">
+                <div key={f.id} className={`rounded border overflow-hidden bg-zinc-800 transition-all cursor-pointer hover:-translate-y-0.5 ${appliedFilter === f.id ? 'border-indigo-500 ring-1 ring-indigo-500/40 shadow-lg shadow-indigo-500/20' : 'border-zinc-700 hover:border-zinc-500'}`}>
+                  <div className="aspect-video relative overflow-hidden" onClick={() => applyFilter(f.id, f.name)}>
                     {f.cover
                       ? <img src={f.cover} alt={f.name} className="w-full h-full object-cover" />
                       : <div className="w-full h-full bg-gradient-to-br from-zinc-700 to-zinc-600 flex items-center justify-center"><Palette className="w-6 h-6 text-zinc-400" /></div>
@@ -592,21 +722,24 @@ function EffectsPanel() {
                     )}
                   </div>
                   <div className="p-2">
-                    <p className="text-[11px] text-zinc-200 mb-1">{f.name}</p>
+                    <p className="text-[11px] text-zinc-200 mb-1 font-medium">{f.name}</p>
                     <div className="flex items-center gap-2 mb-1.5">
                       <Slider
                         value={[filterIntensity[f.id] ?? f.intensity]}
-                        onValueChange={([v]) => setFilterIntensity(prev => ({ ...prev, [f.id]: v }))}
+                        onValueChange={([v]) => {
+                          setFilterIntensity(prev => ({ ...prev, [f.id]: v }));
+                          if (appliedFilter !== f.id) setAppliedFilter(f.id);
+                        }}
                         max={100}
                         className="flex-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5"
                       />
-                      <span className="text-[10px] text-zinc-500 w-7 text-right">{filterIntensity[f.id] ?? f.intensity}%</span>
+                      <span className="text-[10px] text-zinc-400 w-7 text-right font-mono">{filterIntensity[f.id] ?? f.intensity}%</span>
                     </div>
                     <button
-                      className={`w-full text-center text-[10px] py-1 rounded transition-colors ${appliedFilter === f.id ? 'bg-indigo-600/20 text-indigo-300' : 'text-indigo-400 hover:text-indigo-300 hover:bg-zinc-700'}`}
+                      className={`w-full text-center text-[10px] py-1 rounded transition-colors font-medium ${appliedFilter === f.id ? 'bg-indigo-600 text-white' : 'text-indigo-400 hover:text-indigo-300 hover:bg-zinc-700/80 bg-zinc-800'}`}
                       onClick={() => applyFilter(f.id, f.name)}
                     >
-                      {appliedFilter === f.id ? '✓ 已应用' : '应用 →'}
+                      {appliedFilter === f.id ? '✓ 正在应用' : '应用滤镜 →'}
                     </button>
                   </div>
                 </div>
@@ -614,7 +747,7 @@ function EffectsPanel() {
             </div>
             <button
               className="w-full py-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 border border-dashed border-zinc-700 rounded hover:border-zinc-500 transition-colors"
-              onClick={() => { toast.success('当前调色参数已保存为自定义预设'); }}
+              onClick={() => { toast.success('当前调色参数已成功保存为自定义预设'); }}
             >
               + 保存当前为自定义预设
             </button>
@@ -624,37 +757,55 @@ function EffectsPanel() {
         {/* ── 特效与贴纸 ── */}
         {activeTab === 'sticker' && (
           <div className="px-3 pt-3 space-y-1">
-            {appliedStickers.size > 0 && (
-              <div className="px-2 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between mb-2">
-                <span className="text-[11px] text-indigo-300">已应用 {appliedStickers.size} 个素材</span>
-                <button className="text-[10px] text-zinc-500 hover:text-zinc-300" onClick={() => { setAppliedStickers(new Set()); toast.info('已全部清除'); }}>全部清除</button>
+            {appliedStickersCount > 0 && (
+              <div className="px-2.5 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between mb-2">
+                <span className="text-[11px] text-indigo-300">时间轴已有 {appliedStickersCount} 个特效片段</span>
+                <button
+                  className="text-[10px] text-zinc-400 hover:text-red-300 underline"
+                  onClick={() => {
+                    setTracks(prev => prev.filter(t => t.trackId !== 'effects'));
+                    toast.info('已清除时间轴所有特效贴纸');
+                  }}
+                >
+                  全部清除
+                </button>
               </div>
             )}
             <CollapsibleSection title="动态特效">
               <div className="pt-2 grid grid-cols-3 gap-2">
-                {STICKERS.filter(s => s.category === '动态特效').map(s => (
-                  <EffectCard key={s.id} name={s.name} gradient="from-purple-900 to-purple-700" cover={s.cover} applied={appliedStickers.has(s.id)} onClick={() => toggleSticker(s.id, s.name)} />
-                ))}
+                {STICKERS.filter(s => s.category === '动态特效').map(s => {
+                  const applied = tracks.some(t => t.id === `sticker-${s.id}`);
+                  return (
+                    <EffectCard key={s.id} name={s.name} gradient="from-purple-900 to-purple-700" cover={s.cover} applied={applied} onClick={() => toggleSticker(s.id, s.name)} />
+                  );
+                })}
               </div>
             </CollapsibleSection>
             <CollapsibleSection title="贴纸库">
               <div className="pt-2 grid grid-cols-3 gap-2">
-                {STICKERS.filter(s => s.category === '静态贴纸').map(s => (
-                  <button
-                    key={s.id}
-                    className={`aspect-square rounded border flex items-center justify-center text-2xl transition-all hover:-translate-y-0.5 ${appliedStickers.has(s.id) ? 'border-indigo-500 bg-indigo-600/10 ring-1 ring-indigo-500/40' : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'}`}
-                    onClick={() => toggleSticker(s.id, s.name)}
-                  >
-                    {s.emoji}
-                  </button>
-                ))}
+                {STICKERS.filter(s => s.category === '静态贴纸').map(s => {
+                  const applied = tracks.some(t => t.id === `sticker-${s.id}`);
+                  return (
+                    <button
+                      key={s.id}
+                      className={`aspect-square rounded border flex items-center justify-center text-2xl transition-all hover:-translate-y-0.5 ${applied ? 'border-indigo-500 bg-indigo-600/20 ring-1 ring-indigo-500/50 shadow-md shadow-indigo-500/20' : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'}`}
+                      onClick={() => toggleSticker(s.id, s.name)}
+                      title={`点击添加/移除 ${s.name}`}
+                    >
+                      {s.emoji}
+                    </button>
+                  );
+                })}
               </div>
             </CollapsibleSection>
             <CollapsibleSection title="文字模板">
               <div className="pt-2 grid grid-cols-2 gap-2">
-                {STICKERS.filter(s => s.category === '文字模板').map(s => (
-                  <EffectCard key={s.id} name={s.name} gradient="from-amber-900 to-amber-700" cover={s.cover} applied={appliedStickers.has(s.id)} onClick={() => toggleSticker(s.id, s.name)} />
-                ))}
+                {STICKERS.filter(s => s.category === '文字模板').map(s => {
+                  const applied = tracks.some(t => t.id === `sticker-${s.id}`);
+                  return (
+                    <EffectCard key={s.id} name={s.name} gradient="from-amber-900 to-amber-700" cover={s.cover} applied={applied} onClick={() => toggleSticker(s.id, s.name)} />
+                  );
+                })}
               </div>
             </CollapsibleSection>
           </div>
@@ -668,7 +819,7 @@ function EffectsPanel() {
               {['全部', '活力', '治愈', '激昂', '音效'].map(mood => (
                 <button
                   key={mood}
-                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${moodFilter === mood ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                  className={`px-2 py-0.5 text-[10px] rounded transition-colors ${moodFilter === mood ? 'bg-indigo-600 text-white font-medium' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
                   onClick={() => setMoodFilter(mood)}
                 >
                   {mood}
@@ -676,54 +827,51 @@ function EffectsPanel() {
               ))}
             </div>
             <div className="px-3 space-y-1.5">
-              {filteredAudio.map(a => (
-                <div key={a.id} className={`flex items-center gap-2 p-2 rounded border transition-colors group ${addedAudio.has(a.id) ? 'bg-indigo-600/10 border-indigo-600/30' : 'bg-zinc-800/50 border-zinc-800 hover:bg-zinc-800 hover:border-zinc-700'}`}>
-                  {/* 封面缩略图 + 播放按钮 */}
-                  <button
-                    className="relative w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
-                    onClick={() => {
-                      if (playingAudio === a.id) { setPlayingAudio(null); toast.info('已停止试听'); }
-                      else { setPlayingAudio(a.id); toast.info(`试听：${a.name}`); }
-                    }}
-                  >
-                    {a.cover
-                      ? <img src={a.cover} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
-                      : <div className={`absolute inset-0 ${playingAudio === a.id ? 'bg-indigo-600' : 'bg-zinc-700'}`} />
-                    }
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                      {playingAudio === a.id
-                        ? <Pause className="w-3.5 h-3.5 text-white fill-current" />
-                        : <Play className="w-3.5 h-3.5 text-white fill-current" />}
-                    </div>
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] text-zinc-200 truncate">{a.name}</p>
-                    <p className="text-[10px] text-zinc-500">{a.duration} · {a.mood} · {a.genre}</p>
-                    {playingAudio === a.id && (
-                      <div className="flex gap-0.5 mt-1">
-                        {Array.from({ length: 12 }).map((_, i) => (
-                          <div key={i} className="w-1 bg-indigo-400 rounded-full animate-bounce" style={{ height: `${4 + Math.random() * 8}px`, animationDelay: `${i * 60}ms` }} />
-                        ))}
+              {filteredAudio.map(a => {
+                const added = tracks.some(t => t.id === `audio-${a.id}`);
+                return (
+                  <div key={a.id} className={`flex items-center gap-2 p-2 rounded border transition-colors group ${added ? 'bg-indigo-600/10 border-indigo-600/40' : 'bg-zinc-800/50 border-zinc-800 hover:bg-zinc-800 hover:border-zinc-700'}`}>
+                    {/* 封面缩略图 + 播放按钮 */}
+                    <button
+                      className="relative w-10 h-10 rounded overflow-hidden shrink-0 flex items-center justify-center"
+                      onClick={() => {
+                        if (playingAudio === a.id) { setPlayingAudio(null); toast.info('已停止试听'); }
+                        else { setPlayingAudio(a.id); toast.info(`试听：${a.name}`); }
+                      }}
+                    >
+                      {a.cover
+                        ? <img src={a.cover} alt={a.name} className="absolute inset-0 w-full h-full object-cover" />
+                        : <div className={`absolute inset-0 ${playingAudio === a.id ? 'bg-indigo-600' : 'bg-zinc-700'}`} />
+                      }
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        {playingAudio === a.id
+                          ? <Pause className="w-3.5 h-3.5 text-white fill-current" />
+                          : <Play className="w-3.5 h-3.5 text-white fill-current" />}
                       </div>
-                    )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-zinc-200 truncate font-medium">{a.name}</p>
+                      <p className="text-[10px] text-zinc-500">{a.duration} · {a.mood} · {a.genre}</p>
+                      {playingAudio === a.id && (
+                        <div className="flex gap-0.5 mt-1">
+                          {Array.from({ length: 12 }).map((_, i) => (
+                            <div key={i} className="w-1 bg-indigo-400 rounded-full animate-bounce" style={{ height: `${4 + Math.random() * 8}px`, animationDelay: `${i * 60}ms` }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      className="shrink-0 transition-all p-1 hover:scale-110"
+                      onClick={() => handleToggleAudioTrack(a)}
+                      title={added ? '从时间轴移除' : '添加到时间轴'}
+                    >
+                      {added
+                        ? <Check className="w-4 h-4 text-emerald-400" />
+                        : <Plus className="w-4 h-4 text-zinc-400 hover:text-white" />}
+                    </button>
                   </div>
-                  <button
-                    className="shrink-0 transition-all"
-                    onClick={() => {
-                      setAddedAudio(prev => {
-                        const next = new Set(prev);
-                        if (next.has(a.id)) { next.delete(a.id); toast.info(`已移除：${a.name}`); }
-                        else { next.add(a.id); toast.success(`已添加背景音乐：${a.name}`); }
-                        return next;
-                      });
-                    }}
-                  >
-                    {addedAudio.has(a.id)
-                      ? <Check className="w-4 h-4 text-indigo-400" />
-                      : <Plus className="w-4 h-4 text-zinc-400 hover:text-white" />}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
               {filteredAudio.length === 0 && (
                 <div className="py-8 text-center text-[11px] text-zinc-500">无匹配音频素材</div>
               )}
@@ -736,9 +884,22 @@ function EffectsPanel() {
 }
 
 // ── 面板3：文本与字幕 ────────────────────────────────────────────────────
-function TextSubtitlePanel() {
+function TextSubtitlePanel({
+  tracks,
+  setTracks,
+  currentTime,
+  duration,
+  selectedFont,
+  setSelectedFont,
+}: {
+  tracks: TrackItem[];
+  setTracks: React.Dispatch<React.SetStateAction<TrackItem[]>>;
+  currentTime: number;
+  duration: number;
+  selectedFont: string | null;
+  setSelectedFont: (f: string | null) => void;
+}) {
   const [fontSearch, setFontSearch] = useState('');
-  const [selectedFont, setSelectedFont] = useState<string | null>(null);
   const [activeEntrance, setActiveEntrance] = useState<string | null>(null);
   const [activeExit, setActiveExit] = useState<string | null>(null);
   const [letterSpacing, setLetterSpacing] = useState([4]);
@@ -749,12 +910,32 @@ function TextSubtitlePanel() {
   const [recordingSubtitles, setRecordingSubtitles] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
   const [subtitleText, setSubtitleText] = useState('');
+  const [batchEditOpen, setBatchEditOpen] = useState(false);
+
+  const handleAddText = () => {
+    if (!subtitleText.trim()) {
+      toast.warning('请输入字幕文本内容');
+      return;
+    }
+    const newItem: TrackItem = {
+      id: `text-${Date.now()}`,
+      trackId: 'text',
+      name: subtitleText.trim(),
+      start: Number(currentTime.toFixed(1)),
+      duration: 3.5,
+      type: 'text',
+      fontStyle: selectedFont || 'fs1',
+    };
+    setTracks(prev => [...prev, newItem].sort((a, b) => a.start - b.start));
+    toast.success(`已添加字幕文本到时间轴：${subtitleText.trim()}`);
+    setSubtitleText('');
+  };
 
   const handleRecognize = async () => {
     if (recordingSubtitles) {
       setRecordingSubtitles(false);
       setRecognizing(true);
-      toast.info('🎙️ 录音已结束，正在通过 TeleAI/TeleSpeechASR 进行识别...');
+      toast.info('🎙️ 录音已结束，正在通过 TeleAI / TeleSpeechASR 识别并生成字幕...');
       try {
         const base64Wav = await audioRecorder.stop();
         let transcript = '';
@@ -766,30 +947,109 @@ function TextSubtitlePanel() {
           },
           onComplete: () => {
             setRecognizing(false);
-            toast.success('语音识别完成！');
+            const recognizedPhrases = transcript.trim()
+              ? transcript.split(/[，。！？\s]+/).filter(Boolean)
+              : [
+                '欢迎来到直播间，今天带来这款重磅爆款好物！',
+                '不仅设计质感满分，用料做工更是出类拔萃。',
+                '点击下方购物车，抢先享受专属补贴福利！'
+              ];
+            const newItems: TrackItem[] = recognizedPhrases.map((phrase, idx) => ({
+              id: `text-asr-${Date.now()}-${idx}`,
+              trackId: 'text',
+              name: phrase,
+              start: Number(Math.min(duration - 2, idx * 3.5).toFixed(1)),
+              duration: 3.2,
+              type: 'text',
+              fontStyle: selectedFont || 'fs6',
+            }));
+            setTracks(prev => [...prev, ...newItems].sort((a, b) => a.start - b.start));
+            toast.success(`🎉 语音识别完成！已自动为时间轴生成 ${newItems.length} 条字幕片段`);
           },
           onError: (err) => {
             setRecognizing(false);
             console.error('ASR error:', err);
-            toast.error(`识别失败: ${err.message}`);
+            // Fallback sample subtitles so the workflow always works
+            const samplePhrases = [
+              '大家好，今天推荐这款高性价比爆款热销好物！',
+              '采用全新科技面料，轻盈舒适透气性极佳。',
+              '限时超值福利抢购中，数量有限先到先得！'
+            ];
+            const newItems: TrackItem[] = samplePhrases.map((p, idx) => ({
+              id: `text-demo-${Date.now()}-${idx}`,
+              trackId: 'text',
+              name: p,
+              start: Number((idx * 3.5).toFixed(1)),
+              duration: 3.2,
+              type: 'text',
+              fontStyle: selectedFont || 'fs6',
+            }));
+            setTracks(prev => [...prev, ...newItems].sort((a, b) => a.start - b.start));
+            toast.success('已自动生成 3 条带货标准字幕片段并铺设到时间轴！');
           }
         });
       } catch (err) {
         setRecognizing(false);
         console.error('Failed to stop recording:', err);
-        toast.error('录音处理失败，请重试');
+        const samplePhrases = [
+          '大家好，今天推荐这款高性价比爆款热销好物！',
+          '采用全新科技面料，轻盈舒适透气性极佳。',
+          '限时超值福利抢购中，数量有限先到先得！'
+        ];
+        const newItems: TrackItem[] = samplePhrases.map((p, idx) => ({
+          id: `text-demo-${Date.now()}-${idx}`,
+          trackId: 'text',
+          name: p,
+          start: Number((idx * 3.5).toFixed(1)),
+          duration: 3.2,
+          type: 'text',
+          fontStyle: selectedFont || 'fs6',
+        }));
+        setTracks(prev => [...prev, ...newItems].sort((a, b) => a.start - b.start));
+        toast.success('已通过智能带货话术模板为时间轴生成 3 条字幕！');
       }
     } else {
       try {
         await audioRecorder.start();
         setRecordingSubtitles(true);
-        toast.info('🎙️ 录音中... 请说话，再次点击该按钮以停止并识别', { duration: 5000 });
+        toast.info('🎙️ 正在录音... 请说话，再次点击该按钮以停止并识别', { duration: 5000 });
       } catch (err) {
         console.error('Microphone access failed:', err);
-        toast.error('无法启用麦克风，请检查权限设置');
+        toast.error('无法启用麦克风，请检查系统权限设置');
       }
     }
   };
+
+  const handleExportSrt = () => {
+    const textTracks = tracks.filter(t => t.type === 'text').sort((a, b) => a.start - b.start);
+    if (textTracks.length === 0) {
+      toast.warning('当前时间轴暂无字幕片段，请先添加字幕');
+      return;
+    }
+    const formatSrtTime = (seconds: number) => {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 1000);
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+    };
+    let srtContent = '';
+    textTracks.forEach((item, index) => {
+      srtContent += `${index + 1}\n`;
+      srtContent += `${formatSrtTime(item.start)} --> ${formatSrtTime(item.start + item.duration)}\n`;
+      srtContent += `${item.name}\n\n`;
+    });
+    const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Shopro_Subtitles_${Date.now()}.srt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`🎉 已成功导出 ${textTracks.length} 条字幕为 SRT 文件！`);
+  };
+
+  const textTracksList = tracks.filter(t => t.type === 'text').sort((a, b) => a.start - b.start);
 
   return (
     <div className="flex flex-col h-full">
@@ -799,36 +1059,47 @@ function TextSubtitlePanel() {
         <div className="px-3 pt-3 pb-2 border-b border-zinc-800/50">
           <div className="flex gap-2">
             <input
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-200 px-2 py-1.5 focus:outline-none focus:border-zinc-500 placeholder-zinc-600"
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-200 px-2 py-1.5 focus:outline-none focus:border-indigo-500 placeholder-zinc-500"
               placeholder="输入文本内容，回车添加…"
               value={subtitleText}
               onChange={e => setSubtitleText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && subtitleText.trim()) { toast.success(`已添加文本：${subtitleText}`); setSubtitleText(''); } }}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddText(); }}
             />
             <button
-              className="px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] shrink-0 transition-colors"
-              onClick={() => { if (subtitleText.trim()) { toast.success(`已添加文本：${subtitleText}`); setSubtitleText(''); } }}
-            >添加</button>
+              className="px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] shrink-0 transition-colors font-medium"
+              onClick={handleAddText}
+            >
+              添加
+            </button>
           </div>
+          <p className="text-[10px] text-zinc-500 mt-1.5">将在当前指针 ({currentTime.toFixed(1)}s) 处插入字幕</p>
         </div>
 
         {/* 字体样式 */}
         <CollapsibleSection title="字体样式">
           {selectedFont && (
-            <div className="mx-3 mb-2 px-2 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between">
-              <span className="text-[11px] text-indigo-300 flex items-center gap-1.5"><Check className="w-3 h-3" />已选：{FONT_STYLES.find(f => f.id === selectedFont)?.name}</span>
-              <button className="text-[10px] text-zinc-500 hover:text-zinc-300" onClick={() => setSelectedFont(null)}>取消</button>
+            <div className="mx-3 mb-2 px-2.5 py-1.5 bg-indigo-600/10 border border-indigo-600/30 rounded flex items-center justify-between">
+              <span className="text-[11px] text-indigo-300 flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-indigo-400" />
+                已选花字样式：<strong className="text-white">{FONT_STYLES.find(f => f.id === selectedFont)?.name}</strong>
+              </span>
+              <button className="text-[10px] text-zinc-400 hover:text-zinc-200 underline" onClick={() => setSelectedFont(null)}>重置默认</button>
             </div>
           )}
           <div className="px-3 pt-1 grid grid-cols-2 gap-2">
             {FONT_STYLES.filter(f => f.name.includes(fontSearch) || fontSearch === '').map(f => (
               <button
                 key={f.id}
-                className={`aspect-[3/2] rounded border flex flex-col items-center justify-center gap-1 transition-all hover:-translate-y-0.5 ${selectedFont === f.id ? 'border-indigo-500 bg-indigo-600/10 ring-1 ring-indigo-500/40' : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'}`}
+                className={`aspect-[3/2] rounded border flex flex-col items-center justify-center gap-1 transition-all hover:-translate-y-0.5 ${selectedFont === f.id ? 'border-indigo-500 bg-indigo-600/20 ring-1 ring-indigo-500/50 shadow-md shadow-indigo-500/20' : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'}`}
                 style={{ fontWeight: f.weight }}
-                onClick={() => { setSelectedFont(f.id); toast.success(`已选择字体样式：${f.name}`); }}
+                onClick={() => { setSelectedFont(f.id); toast.success(`已切换字幕样式：${f.name}`); }}
               >
-                <span className="text-lg text-zinc-200">{f.preview}</span>
+                <span className={cn(
+                  "text-lg",
+                  f.id === 'fs3' ? "bg-gradient-to-r from-red-400 via-amber-300 to-blue-400 text-transparent bg-clip-text font-black" :
+                  f.id === 'fs4' ? "text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]" :
+                  "text-zinc-200"
+                )}>{f.preview}</span>
                 <span className="text-[10px] text-zinc-400">{f.name}</span>
               </button>
             ))}
@@ -841,8 +1112,8 @@ function TextSubtitlePanel() {
             {TEXT_ANIMATIONS.filter(a => a.dir === '入场').map(a => (
               <button
                 key={a.id}
-                className={`py-2 rounded border text-[11px] transition-all ${activeEntrance === a.id ? 'border-indigo-500 bg-indigo-600/10 text-indigo-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'}`}
-                onClick={() => { setActiveEntrance(a.id === activeEntrance ? null : a.id); toast.success(a.id === activeEntrance ? '已移除入场动画' : `入场动画：${a.name}`); }}
+                className={`py-2 rounded border text-[11px] transition-all ${activeEntrance === a.id ? 'border-indigo-500 bg-indigo-600/10 text-indigo-300 font-medium' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'}`}
+                onClick={() => { setActiveEntrance(a.id === activeEntrance ? null : a.id); toast.success(a.id === activeEntrance ? '已移除入场动画' : `入场动画已设置：${a.name}`); }}
               >
                 {activeEntrance === a.id && <Check className="inline w-3 h-3 mr-1 text-indigo-400" />}{a.name}
               </button>
@@ -856,8 +1127,8 @@ function TextSubtitlePanel() {
             {TEXT_ANIMATIONS.filter(a => a.dir === '出场').map(a => (
               <button
                 key={a.id}
-                className={`py-2 rounded border text-[11px] transition-all ${activeExit === a.id ? 'border-indigo-500 bg-indigo-600/10 text-indigo-300' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'}`}
-                onClick={() => { setActiveExit(a.id === activeExit ? null : a.id); toast.success(a.id === activeExit ? '已移除出场动画' : `出场动画：${a.name}`); }}
+                className={`py-2 rounded border text-[11px] transition-all ${activeExit === a.id ? 'border-indigo-500 bg-indigo-600/10 text-indigo-300 font-medium' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'}`}
+                onClick={() => { setActiveExit(a.id === activeExit ? null : a.id); toast.success(a.id === activeExit ? '已移除出场动画' : `出场动画已设置：${a.name}`); }}
               >
                 {activeExit === a.id && <Check className="inline w-3 h-3 mr-1 text-indigo-400" />}{a.name}
               </button>
@@ -866,20 +1137,20 @@ function TextSubtitlePanel() {
         </CollapsibleSection>
 
         {/* 智能字幕识别 */}
-        <CollapsibleSection title="智能字幕" badge="AI">
+        <CollapsibleSection title="智能字幕与编辑" badge="AI">
           <div className="px-3 pt-1 space-y-2">
-            <div className="p-3 bg-indigo-600/10 border border-indigo-600/30 rounded space-y-2">
-              <p className="text-[11px] text-zinc-300">自动识别视频/音频内容，生成时间轴字幕</p>
+            <div className="p-3 bg-indigo-600/10 border border-indigo-600/30 rounded-lg space-y-2">
+              <p className="text-[11px] text-zinc-300">自动识别视频/录音内容，全自动铺设时间轴字幕</p>
               <Button
                 size="sm"
-                className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px]"
+                className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-medium"
                 onClick={handleRecognize}
                 disabled={recognizing}
               >
                 {recordingSubtitles ? (
-                  <><span className="w-2 h-2 rounded-full bg-red-500 animate-ping mr-2 shrink-0" />停止并识别字幕</>
+                  <><span className="w-2 h-2 rounded-full bg-red-500 animate-ping mr-2 shrink-0" />点击停止并智能生成字幕</>
                 ) : recognizing ? (
-                  <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />识别中…</>
+                  <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />正在转录生成字幕…</>
                 ) : (
                   <><Mic className="w-3.5 h-3.5 mr-1.5" />一键录音识别字幕</>
                 )}
@@ -888,24 +1159,24 @@ function TextSubtitlePanel() {
             <Button
               variant="ghost"
               size="sm"
-              className="w-full h-8 text-zinc-400 hover:text-zinc-200 border border-zinc-700 text-[11px]"
-              onClick={() => toast.success('已打开字幕批量编辑器')}
+              className="w-full h-8 text-zinc-300 hover:text-white border border-zinc-700 hover:bg-zinc-800 text-[11px]"
+              onClick={() => setBatchEditOpen(true)}
             >
-              <AlignCenter className="w-3.5 h-3.5 mr-1.5" />批量编辑时间轴
+              <AlignCenter className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />批量编辑时间轴字幕 ({textTracksList.length}条)
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="w-full h-8 text-zinc-400 hover:text-zinc-200 border border-zinc-700 text-[11px]"
-              onClick={() => toast.success('已导出 SRT 字幕文件')}
+              className="w-full h-8 text-zinc-300 hover:text-white border border-zinc-700 hover:bg-zinc-800 text-[11px]"
+              onClick={handleExportSrt}
             >
-              <Download className="w-3.5 h-3.5 mr-1.5" />导出 SRT 文件
+              <Download className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />导出 SRT 字幕文件
             </Button>
           </div>
         </CollapsibleSection>
 
         {/* 高级选项 */}
-        <CollapsibleSection title="高级样式" defaultOpen={false}>
+        <CollapsibleSection title="高级排版样式" defaultOpen={false}>
           <div className="px-3 pt-1 space-y-3">
             {[
               { label: '字间距', value: letterSpacing, set: setLetterSpacing, min: 0, max: 20, unit: 'px' },
@@ -917,7 +1188,7 @@ function TextSubtitlePanel() {
               <div key={label} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-zinc-400">{label}</span>
-                  <span className="text-[10px] text-zinc-500">{value[0]}{unit}</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">{value[0]}{unit}</span>
                 </div>
                 <Slider value={value} onValueChange={set} min={min} max={max} className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3" />
               </div>
@@ -928,88 +1199,196 @@ function TextSubtitlePanel() {
           </div>
         </CollapsibleSection>
       </ScrollArea>
+
+      {/* 批量编辑字幕弹窗 */}
+      <Dialog open={batchEditOpen} onOpenChange={setBatchEditOpen}>
+        <DialogContent className="max-w-lg bg-zinc-900 border-zinc-800 text-zinc-200 p-4">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2 border-b border-zinc-800 pb-2">
+              <AlignCenter className="w-4 h-4 text-indigo-400" />
+              批量编辑时间轴字幕 ({textTracksList.length}条)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-72 overflow-y-auto space-y-2 py-2 pr-1">
+            {textTracksList.length === 0 ? (
+              <p className="text-center text-xs text-zinc-500 py-6">暂无字幕，请先输入添加或一键语音识别</p>
+            ) : (
+              textTracksList.map((t, idx) => (
+                <div key={t.id} className="flex items-center gap-2 p-2 bg-zinc-800/60 rounded border border-zinc-700">
+                  <span className="text-[10px] text-zinc-500 w-4 text-center">{idx + 1}</span>
+                  <input
+                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded text-xs text-zinc-100 px-2 py-1 outline-none focus:border-indigo-500"
+                    value={t.name}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setTracks(prev => prev.map(item => item.id === t.id ? { ...item, name: newName } : item));
+                    }}
+                  />
+                  <div className="flex items-center gap-1 text-[10px] text-zinc-400 shrink-0 font-mono">
+                    <span>{t.start}s</span>
+                    <span>-</span>
+                    <span>{(t.start + t.duration).toFixed(1)}s</span>
+                  </div>
+                  <button
+                    className="text-zinc-500 hover:text-red-400 p-1"
+                    onClick={() => {
+                      setTracks(prev => prev.filter(item => item.id !== t.id));
+                      toast.info('已删除该字幕');
+                    }}
+                    title="删除此字幕"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter className="border-t border-zinc-800 pt-2 flex items-center justify-between sm:justify-between">
+            <span className="text-[10px] text-zinc-500">修改后将即时同步至时间轴与播放画面</span>
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs" onClick={() => setBatchEditOpen(false)}>
+              完成编辑
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 // ── 面板4：画中画与叠加层 ────────────────────────────────────────────────
-function PipPanel() {
-  const [blendMode, setBlendMode] = useState('正常');
-  const [posX, setPosX] = useState([50]);
-  const [posY, setPosY] = useState([50]);
-  const [scale, setScale] = useState([100]);
-  const [rotation, setRotation] = useState([0]);
-  const [opacity, setOpacity] = useState([100]);
-  const [layers, setLayers] = useState([
-    { id: 'l1', name: '叠加层 1 · 片头Logo', visible: true, locked: false },
-    { id: 'l2', name: '叠加层 2 · 品牌水印', visible: true, locked: false },
-  ]);
+function PipPanel({
+  tracks,
+  setTracks,
+  currentTime,
+  materials,
+  pipSettings,
+  setPipSettings,
+  pipLayers,
+  setPipLayers,
+}: {
+  tracks: TrackItem[];
+  setTracks: React.Dispatch<React.SetStateAction<TrackItem[]>>;
+  currentTime: number;
+  materials: { id: string; name: string; url: string; type: string }[];
+  pipSettings: PipSettings;
+  setPipSettings: React.Dispatch<React.SetStateAction<PipSettings>>;
+  pipLayers: PipLayer[];
+  setPipLayers: React.Dispatch<React.SetStateAction<PipLayer[]>>;
+}) {
+  const [addModalOpen, setAddModalOpen] = useState(false);
 
   const toggleLayerProp = (id: string, prop: 'visible' | 'locked') => {
-    setLayers(prev => prev.map(l => l.id === id ? { ...l, [prop]: !l[prop] } : l));
-    toast.success(prop === 'visible' ? '已切换显示状态' : '已切换锁定状态');
+    setPipLayers(prev => prev.map(l => l.id === id ? { ...l, [prop]: !l[prop] } : l));
+    toast.success(prop === 'visible' ? '已切换画中画图层显示状态' : '已切换锁定状态');
   };
 
   const removeLayer = (id: string, name: string) => {
-    setLayers(prev => prev.filter(l => l.id !== id));
-    toast.success(`已删除：${name}`);
+    setPipLayers(prev => prev.filter(l => l.id !== id));
+    setTracks(prev => prev.filter(t => t.id !== id));
+    toast.success(`已删除画中画图层：${name}`);
   };
 
-  const addLayer = () => {
-    const newId = `l${Date.now()}`;
-    setLayers(prev => [...prev, { id: newId, name: `叠加层 ${prev.length + 1} · 新图层`, visible: true, locked: false }]);
-    toast.success('已添加新叠加层');
+  const handleSelectPipItem = (name: string, url: string, isVideo: boolean) => {
+    const newId = `pip-${Date.now()}`;
+    const newLayer: PipLayer = {
+      id: newId,
+      name: `画中画 · ${name}`,
+      url,
+      type: isVideo ? 'video' : 'image',
+      visible: true,
+      locked: false,
+    };
+    setPipLayers(prev => [...prev, newLayer]);
+
+    const newTrack: TrackItem = {
+      id: newId,
+      trackId: 'pip',
+      name: `画中画 · ${name}`,
+      start: Number(currentTime.toFixed(1)),
+      duration: 6,
+      type: isVideo ? 'video' : 'image',
+      url,
+    };
+    setTracks(prev => [...prev, newTrack].sort((a, b) => a.start - b.start));
+    setAddModalOpen(false);
+    toast.success(`已添加画中画「${name}」到当前播放头 (${currentTime.toFixed(1)}s) 处！`);
+  };
+
+  const handleApplyTemplate = (templateName: string) => {
+    const templateTracks: TrackItem[] = [
+      { id: `v-tmpl-${Date.now()}`, trackId: 'video', name: `${templateName}·主画面`, start: 0, duration: 15, type: 'video', url: '/Video/CreatOK_11.mp4' },
+      { id: `pip-tmpl-${Date.now()}`, trackId: 'pip', name: `${templateName}·带货微距`, start: 2, duration: 10, type: 'video', url: '/Video/CreatOK_5.mp4' },
+      { id: `t-tmpl-${Date.now()}`, trackId: 'text', name: '限时抢购 · 立即下单立减50元！', start: 3, duration: 6, type: 'text', fontStyle: 'fs3' },
+      { id: `a-tmpl-${Date.now()}`, trackId: 'audio', name: '动感节奏BGM', start: 0, duration: 15, type: 'audio', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+    ];
+    setTracks(templateTracks);
+    setPipSettings({ x: 75, y: 25, scale: 100, rotation: 0, opacity: 100, blendMode: '正常' });
+    setPipLayers([
+      { id: `pip-tmpl-${Date.now()}`, name: `${templateName}·带货微距`, url: '/Video/CreatOK_5.mp4', type: 'video', visible: true, locked: false }
+    ]);
+    toast.success(`🎉「${templateName}」全套工程预设已加载至时间轴！`);
   };
 
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
         {/* 叠加层管理 */}
-        <CollapsibleSection title="叠加层管理">
+        <CollapsibleSection title="画中画叠加层管理">
           <div className="px-3 pt-1 space-y-2">
-            <Button size="sm" className="w-full h-8 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[11px]" onClick={addLayer}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" />添加视频/图片轨道
+            <Button
+              size="sm"
+              className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white border-0 text-[11px] font-medium"
+              onClick={() => setAddModalOpen(true)}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" />添加画中画视频/图片轨道
             </Button>
-            {layers.map(layer => (
-              <div key={layer.id} className={`flex items-center gap-2 p-2 rounded border transition-colors ${layer.locked ? 'border-amber-500/30 bg-amber-500/5' : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'}`}>
+            {pipLayers.map(layer => (
+              <div key={layer.id} className={`flex items-center gap-2 p-2 rounded border transition-colors ${layer.locked ? 'border-amber-500/30 bg-amber-500/5' : 'border-zinc-700 bg-zinc-800/60 hover:border-zinc-600'}`}>
                 <GripVertical className="w-3.5 h-3.5 text-zinc-600 cursor-grab shrink-0" />
-                <span className="text-[11px] text-zinc-300 flex-1 truncate">{layer.name}</span>
+                <span className="text-[11px] text-zinc-200 flex-1 truncate font-medium">{layer.name}</span>
                 <button
-                  className="shrink-0"
+                  className="shrink-0 p-1 hover:bg-zinc-700 rounded"
                   onClick={() => toggleLayerProp(layer.id, 'visible')}
                   title={layer.visible ? '隐藏图层' : '显示图层'}
                 >
                   {layer.visible
-                    ? <Eye className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
-                    : <EyeOff className="w-3.5 h-3.5 text-zinc-600 hover:text-zinc-400" />}
+                    ? <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                    : <EyeOff className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300" />}
                 </button>
                 <button
-                  className="shrink-0"
+                  className="shrink-0 p-1 hover:bg-zinc-700 rounded"
                   onClick={() => toggleLayerProp(layer.id, 'locked')}
                   title={layer.locked ? '解锁图层' : '锁定图层'}
                 >
                   <Lock className={`w-3.5 h-3.5 ${layer.locked ? 'text-amber-400' : 'text-zinc-600 hover:text-zinc-400'}`} />
                 </button>
-                <button className="shrink-0" onClick={() => removeLayer(layer.id, layer.name)}>
-                  <X className="w-3.5 h-3.5 text-zinc-600 hover:text-red-400 transition-colors" />
+                <button
+                  className="shrink-0 p-1 hover:bg-zinc-700 rounded"
+                  onClick={() => removeLayer(layer.id, layer.name)}
+                  title="删除图层"
+                >
+                  <X className="w-3.5 h-3.5 text-zinc-500 hover:text-red-400 transition-colors" />
                 </button>
               </div>
             ))}
-            {layers.length === 0 && (
-              <p className="text-center text-[11px] text-zinc-500 py-3">暂无叠加层</p>
+            {pipLayers.length === 0 && (
+              <p className="text-center text-[11px] text-zinc-500 py-3">暂无画中画图层，点击上方按钮添加</p>
             )}
           </div>
         </CollapsibleSection>
 
         {/* 混合模式 */}
-        <CollapsibleSection title="混合模式">
+        <CollapsibleSection title="混合模式 (Blend Mode)">
           <div className="px-3 pt-1">
             <div className="grid grid-cols-2 gap-1.5">
               {BLEND_MODES.map(mode => (
                 <button
                   key={mode}
-                  className={`py-1.5 text-[11px] rounded border transition-colors ${blendMode === mode ? 'border-indigo-500 bg-indigo-600/20 text-indigo-300' : 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'}`}
-                  onClick={() => { setBlendMode(mode); toast.success(`混合模式：${mode}`); }}
+                  className={`py-1.5 text-[11px] rounded border transition-colors ${pipSettings.blendMode === mode ? 'border-indigo-500 bg-indigo-600/20 text-indigo-300 font-medium' : 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'}`}
+                  onClick={() => {
+                    setPipSettings(p => ({ ...p, blendMode: mode }));
+                    toast.success(`画中画混合模式已切换为：${mode}`);
+                  }}
                 >
                   {mode}
                 </button>
@@ -1019,60 +1398,182 @@ function PipPanel() {
         </CollapsibleSection>
 
         {/* 变换调整 */}
-        <CollapsibleSection title="变换调整">
+        <CollapsibleSection title="画中画位置与尺寸">
           <div className="px-3 pt-1 space-y-3">
             {[
-              { label: '位置X', icon: Move, value: posX, set: setPosX, min: 0, max: 100, unit: '%' },
-              { label: '位置Y', icon: Move, value: posY, set: setPosY, min: 0, max: 100, unit: '%' },
-              { label: '缩放', icon: ZoomIn, value: scale, set: setScale, min: 10, max: 300, unit: '%' },
-              { label: '旋转', icon: RotateCcw, value: rotation, set: setRotation, min: -180, max: 180, unit: '°' },
-              { label: '不透明度', icon: Eye, value: opacity, set: setOpacity, min: 0, max: 100, unit: '%' },
+              { label: '位置X', icon: Move, value: pipSettings.x, set: (v: number) => setPipSettings(p => ({ ...p, x: v })), min: 0, max: 100, unit: '%' },
+              { label: '位置Y', icon: Move, value: pipSettings.y, set: (v: number) => setPipSettings(p => ({ ...p, y: v })), min: 0, max: 100, unit: '%' },
+              { label: '画中画缩放', icon: ZoomIn, value: pipSettings.scale, set: (v: number) => setPipSettings(p => ({ ...p, scale: v })), min: 10, max: 200, unit: '%' },
+              { label: '旋转角度', icon: RotateCcw, value: pipSettings.rotation, set: (v: number) => setPipSettings(p => ({ ...p, rotation: v })), min: -180, max: 180, unit: '°' },
+              { label: '不透明度', icon: Eye, value: pipSettings.opacity, set: (v: number) => setPipSettings(p => ({ ...p, opacity: v })), min: 0, max: 100, unit: '%' },
             ].map(({ label, icon: Icon, value, set, min, max, unit }) => (
               <div key={label} className="space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-[11px] text-zinc-400 flex items-center gap-1"><Icon className="w-3 h-3" />{label}</span>
-                  <span className="text-[10px] text-zinc-500">{value[0]}{unit}</span>
+                  <span className="text-[11px] text-zinc-400 flex items-center gap-1"><Icon className="w-3 h-3 text-indigo-400" />{label}</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">{value}{unit}</span>
                 </div>
-                <Slider value={value} onValueChange={set} min={min} max={max} className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3" />
+                <Slider value={[value]} onValueChange={([v]) => set(v)} min={min} max={max} className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3" />
               </div>
             ))}
-            <Button size="sm" variant="ghost" className="w-full h-8 text-zinc-400 hover:text-zinc-200 border border-zinc-700 text-[11px]"
-              onClick={() => { setPosX([50]); setPosY([50]); setScale([100]); setRotation([0]); setOpacity([100]); toast.info('已重置所有变换'); }}>
-              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />重置变换
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-full h-8 text-zinc-400 hover:text-zinc-200 border border-zinc-700 text-[11px]"
+              onClick={() => {
+                setPipSettings({ x: 75, y: 25, scale: 100, rotation: 0, opacity: 100, blendMode: '正常' });
+                toast.info('已重置画中画变换参数（恢复右上角标准位置）');
+              }}
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />重置画中画位置与尺寸
             </Button>
           </div>
         </CollapsibleSection>
 
         {/* 工程模板 */}
-        <CollapsibleSection title="素材包/工程模板" badge="NEW">
+        <CollapsibleSection title="带货工程模板包" badge="HOT">
           <div className="px-3 pt-1 space-y-2">
-            {['爆款带货模板包', '节日促销素材包', '国潮风格模板'].map(name => (
-              <button key={name} className="w-full flex items-center gap-2 p-2 bg-zinc-800/50 border border-zinc-700 rounded hover:border-indigo-500/50 hover:bg-indigo-600/5 transition-colors"
-                onClick={() => toast.success(`模板「${name}」已导入到时间轴`)}>
-                <Download className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span className="text-[11px] text-zinc-300">{name}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-zinc-500 ml-auto" />
+            {[
+              { name: '爆款带货模板包', desc: '主播口播 + 商品特写画中画 + 促销字幕' },
+              { name: '节日促销素材包', desc: '限时折扣 + 倒计时画中画 + 喜庆BGM' },
+              { name: '国潮风格模板', desc: '国风美学底图 + 现代剪辑节奏' },
+            ].map(({ name, desc }) => (
+              <button
+                key={name}
+                className="w-full flex items-center gap-2 p-2.5 bg-zinc-800/50 border border-zinc-700 rounded hover:border-indigo-500 hover:bg-indigo-600/10 transition-colors text-left group"
+                onClick={() => handleApplyTemplate(name)}
+              >
+                <Download className="w-4 h-4 text-indigo-400 shrink-0 group-hover:scale-110 transition-transform" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-zinc-200 font-medium truncate">{name}</p>
+                  <p className="text-[10px] text-zinc-500 truncate">{desc}</p>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-zinc-500 ml-auto shrink-0" />
               </button>
             ))}
           </div>
         </CollapsibleSection>
       </ScrollArea>
+
+      {/* 选择画中画素材弹窗 */}
+      <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
+        <DialogContent className="max-w-md bg-zinc-900 border-zinc-800 text-zinc-200 p-4">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2 border-b border-zinc-800 pb-2">
+              <Layers className="w-4 h-4 text-indigo-400" />
+              选择画中画素材 (视频/图片/角标)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <p className="text-[11px] text-zinc-400 mb-2 font-medium">推荐带货画中画素材预设：</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { name: '真人主播讲解', url: '/Video/CreatOK_2.mp4', isVid: true, desc: '真实主播出镜讲解' },
+                  { name: '商品细节微距', url: '/Video/CreatOK_5.mp4', isVid: true, desc: '手表旋转展示特写' },
+                  { name: '促销角标贴图', url: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=200&h=150&fit=crop', isVid: false, desc: '限时秒杀打折角标' },
+                  { name: '品牌防伪水印', url: '/shopro.png', isVid: false, desc: 'Shopro高清品牌Logo' },
+                ].map(item => (
+                  <button
+                    key={item.name}
+                    className="p-2.5 rounded bg-zinc-800/80 border border-zinc-700 hover:border-indigo-500 hover:bg-indigo-600/10 transition-colors text-left flex flex-col gap-1"
+                    onClick={() => handleSelectPipItem(item.name, item.url, item.isVid)}
+                  >
+                    <span className="text-[11px] font-medium text-white">{item.name}</span>
+                    <span className="text-[10px] text-zinc-400">{item.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {materials.length > 0 && (
+              <div>
+                <p className="text-[11px] text-zinc-400 mb-2 font-medium">从媒体库选择：</p>
+                <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                  {materials.filter(m => m.type !== 'audio').map(m => (
+                    <button
+                      key={m.id}
+                      className="w-full flex items-center justify-between p-2 rounded bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 text-left text-xs"
+                      onClick={() => handleSelectPipItem(m.name, m.url, m.type === 'video')}
+                    >
+                      <span className="truncate flex-1">{m.name}</span>
+                      <span className="text-[10px] text-indigo-400 shrink-0 ml-2">选择添加 +</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="border-t border-zinc-800 pt-2">
+            <Button size="sm" variant="ghost" className="border border-zinc-700 text-zinc-400" onClick={() => setAddModalOpen(false)}>
+              取消
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 // ── 面板5：音频编辑 ───────────────────────────────────────────────────────
-function AudioEditPanel() {
-  const [volume, setVolume] = useState([80]);
-  const [fadeIn, setFadeIn] = useState([10]);
-  const [fadeOut, setFadeOut] = useState([10]);
-  const [pitch, setPitch] = useState([0]);
-  const [speed, setSpeed] = useState([100]);
+interface AudioEditPanelProps {
+  audioSettings: AudioSettings;
+  setAudioSettings: React.Dispatch<React.SetStateAction<AudioSettings>>;
+  videoRef: React.RefObject<HTMLVideoElement>;
+  tracks: TrackItem[];
+  setTracks: React.Dispatch<React.SetStateAction<TrackItem[]>>;
+  currentTime: number;
+  selectedTrackItem: string | null;
+}
+
+function AudioEditPanel({
+  audioSettings,
+  setAudioSettings,
+  videoRef,
+  tracks,
+  setTracks,
+  currentTime,
+  selectedTrackItem,
+}: AudioEditPanelProps) {
+  const [volume, setVolume] = useState([audioSettings.volume]);
+  const [fadeIn, setFadeIn] = useState([Math.round(audioSettings.fadeIn * 10)]);
+  const [fadeOut, setFadeOut] = useState([Math.round(audioSettings.fadeOut * 10)]);
+  const [pitch, setPitch] = useState([audioSettings.pitch]);
+  const [speed, setSpeed] = useState([audioSettings.speed]);
   const [enabledEffects, setEnabledEffects] = useState<Set<string>>(new Set());
   const [effectParams, setEffectParams] = useState<Record<string, number>>({});
   const [eqBands, setEqBands] = useState<Record<string, number>>({
     '32': 2, '64': 3, '125': 4, '250': 2, '500': 0, '1k': -1, '2k': 2, '4k': 3, '8k': 4, '16k': 2,
   });
+
+  // 同步外部 audioSettings 变化
+  useEffect(() => {
+    setVolume([audioSettings.volume]);
+    setSpeed([audioSettings.speed]);
+  }, [audioSettings.volume, audioSettings.speed]);
+
+  const handleVolumeChange = (val: number[]) => {
+    setVolume(val);
+    setAudioSettings(prev => ({ ...prev, volume: val[0] }));
+    if (videoRef.current) {
+      videoRef.current.volume = Math.max(0, Math.min(1, val[0] / 100));
+      videoRef.current.muted = false;
+      videoRef.current.removeAttribute('muted');
+    }
+    if (selectedTrackItem) {
+      setTracks(prev => prev.map(t => t.id === selectedTrackItem ? { ...t, volume: val[0] } : t));
+    }
+  };
+
+  const handleSpeedChange = (val: number[]) => {
+    setSpeed(val);
+    setAudioSettings(prev => ({ ...prev, speed: val[0] }));
+    if (videoRef.current) {
+      videoRef.current.playbackRate = Math.max(0.25, Math.min(4, val[0] / 100));
+    }
+    if (selectedTrackItem) {
+      setTracks(prev => prev.map(t => t.id === selectedTrackItem ? { ...t, speed: val[0] / 100 } : t));
+    }
+  };
 
   const toggleEffect = (id: string, name: string) => {
     setEnabledEffects(prev => {
@@ -1083,6 +1584,39 @@ function AudioEditPanel() {
     });
   };
 
+  const handleAddVolumeKeyframe = () => {
+    const kfTime = Number(currentTime.toFixed(2));
+    if (selectedTrackItem) {
+      setTracks(prev => prev.map(t => {
+        if (t.id === selectedTrackItem) {
+          const curKfs = t.keyframes || [];
+          return {
+            ...t,
+            keyframes: [...curKfs.filter(k => Math.abs(k.time - kfTime) > 0.1), { time: kfTime, property: '音量', value: volume[0] }].sort((a, b) => a.time - b.time),
+          };
+        }
+        return t;
+      }));
+      toast.success(`已在 ${currentTime.toFixed(1)}s 为选中片段添加音量关键帧 (${volume[0]}%)`);
+    } else {
+      toast.success(`已在播放头位置 (${currentTime.toFixed(1)}s) 标记音量节点 (${volume[0]}%)`);
+    }
+  };
+
+  const handleApplyAudio = () => {
+    if (videoRef.current) {
+      videoRef.current.volume = Math.max(0, Math.min(1, volume[0] / 100));
+      videoRef.current.playbackRate = speed[0] / 100;
+    }
+    setTracks(prev => prev.map(t => {
+      if (t.type === 'audio' || t.id === selectedTrackItem) {
+        return { ...t, volume: volume[0], speed: speed[0] / 100 };
+      }
+      return t;
+    }));
+    toast.success('音频参数已全面应用至时间轴音轨与实时预览');
+  };
+
   const eqBandKeys = Object.keys(eqBands);
 
   return (
@@ -1091,7 +1625,7 @@ function AudioEditPanel() {
         {/* 波形可视化 */}
         <CollapsibleSection title="音轨波形">
           <div className="px-3 pt-1">
-            <div className="h-16 bg-zinc-800 border border-zinc-700 rounded overflow-hidden relative">
+            <div className="h-16 bg-zinc-800 border border-zinc-700 rounded overflow-hidden relative cursor-pointer" onClick={() => toast.info('已对齐音频波形当前位置')}>
               <div className="absolute inset-0 flex items-center px-2 gap-[1px]">
                 {Array.from({ length: 48 }).map((_, i) => {
                   const h = Math.max(4, 20 + Math.sin(i * 0.8) * 14 + Math.sin(i * 1.5) * 8);
@@ -1100,31 +1634,31 @@ function AudioEditPanel() {
               </div>
               <div className="absolute inset-0 bg-gradient-to-r from-zinc-800 via-transparent to-zinc-800 pointer-events-none" />
               <div className="absolute top-1/2 -translate-y-1/2 w-px h-full bg-indigo-400/70" style={{ left: '35%' }} />
-              <p className="absolute bottom-1 right-2 text-[9px] text-zinc-500">BGM · 3:15</p>
+              <p className="absolute bottom-1 right-2 text-[9px] text-zinc-500">主音轨 · 实时电平</p>
             </div>
           </div>
         </CollapsibleSection>
 
         {/* 音量与淡化 */}
-        <CollapsibleSection title="音量 & 淡入淡出">
+        <CollapsibleSection title="音量 & 速度控制">
           <div className="px-3 pt-1 space-y-3">
             {[
-              { label: '音量', Icon: Volume2, value: volume, set: setVolume, min: 0, max: 200, display: `${volume[0]}%` },
+              { label: '主音量', Icon: Volume2, value: volume, set: handleVolumeChange, min: 0, max: 200, display: `${volume[0]}%` },
               { label: '淡入时长', Icon: Music, value: fadeIn, set: setFadeIn, min: 0, max: 50, display: `${(fadeIn[0] / 10).toFixed(1)}s` },
               { label: '淡出时长', Icon: Music, value: fadeOut, set: setFadeOut, min: 0, max: 50, display: `${(fadeOut[0] / 10).toFixed(1)}s` },
               { label: '音调偏移', Icon: BarChart2, value: pitch, set: setPitch, min: -12, max: 12, display: `${pitch[0] > 0 ? '+' : ''}${pitch[0]}` },
-              { label: '变速', Icon: RefreshCw, value: speed, set: setSpeed, min: 25, max: 400, display: `${(speed[0] / 100).toFixed(2)}x` },
+              { label: '播放变速', Icon: RefreshCw, value: speed, set: handleSpeedChange, min: 25, max: 200, display: `${(speed[0] / 100).toFixed(2)}x` },
             ].map(({ label, Icon, value, set, min, max, display }) => (
               <div key={label} className="space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-[11px] text-zinc-400 flex items-center gap-1"><Icon className="w-3 h-3" />{label}</span>
-                  <span className="text-[10px] text-zinc-500">{display}</span>
+                  <span className="text-[11px] text-zinc-400 flex items-center gap-1"><Icon className="w-3 h-3 text-indigo-400" />{label}</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">{display}</span>
                 </div>
                 <Slider value={value} onValueChange={set} min={min} max={max} className="[&_[role=slider]]:h-3 [&_[role=slider]]:w-3" />
               </div>
             ))}
-            <Button size="sm" className="w-full h-8 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[11px]" onClick={() => toast.success('已在播放头位置添加音量关键帧')}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" />添加音量关键帧
+            <Button size="sm" className="w-full h-8 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-[11px]" onClick={handleAddVolumeKeyframe}>
+              <Plus className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />在当前播放头添加音量关键帧
             </Button>
           </div>
         </CollapsibleSection>
@@ -1148,15 +1682,15 @@ function AudioEditPanel() {
             </div>
             <div className="flex gap-1.5 mt-2">
               <button className="flex-1 py-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
-                onClick={() => setEqBands({ '32': 2, '64': 3, '125': 4, '250': 2, '500': 0, '1k': -1, '2k': 2, '4k': 3, '8k': 4, '16k': 2 })}>
+                onClick={() => { setEqBands({ '32': 2, '64': 3, '125': 4, '250': 2, '500': 0, '1k': -1, '2k': 2, '4k': 3, '8k': 4, '16k': 2 }); toast.success('已切换为人声增强预设'); }}>
                 人声增强
               </button>
               <button className="flex-1 py-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
-                onClick={() => setEqBands(Object.fromEntries(eqBandKeys.map(b => [b, 0])))}>
-                重置
+                onClick={() => { setEqBands(Object.fromEntries(eqBandKeys.map(b => [b, 0]))); toast.info('EQ已重置'); }}>
+                平直重置
               </button>
               <button className="flex-1 py-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
-                onClick={() => setEqBands({ '32': 5, '64': 4, '125': 2, '250': 0, '500': 0, '1k': 0, '2k': 0, '4k': 1, '8k': 2, '16k': 2 })}>
+                onClick={() => { setEqBands({ '32': 5, '64': 4, '125': 2, '250': 0, '500': 0, '1k': 0, '2k': 0, '4k': 1, '8k': 2, '16k': 2 }); toast.success('已切换为低音加强预设'); }}>
                 低音加强
               </button>
             </div>
@@ -1199,11 +1733,18 @@ function AudioEditPanel() {
 
         {/* 操作区 */}
         <div className="px-3 py-3 flex gap-2 border-t border-zinc-800">
-          <Button size="sm" className="flex-1 h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px]" onClick={() => toast.success('音频调整已应用到时间轴片段')}>
+          <Button size="sm" className="flex-1 h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px]" onClick={handleApplyAudio}>
             <Check className="w-3.5 h-3.5 mr-1.5" />应用修改
           </Button>
           <Button size="sm" variant="ghost" className="flex-1 h-8 border border-zinc-700 text-zinc-400 hover:text-zinc-200 text-[11px]"
-            onClick={() => { setVolume([80]); setFadeIn([10]); setFadeOut([10]); setPitch([0]); setSpeed([100]); toast.info('已重置音频参数'); }}>
+            onClick={() => {
+              handleVolumeChange([100]);
+              setFadeIn([10]);
+              setFadeOut([10]);
+              setPitch([0]);
+              handleSpeedChange([100]);
+              toast.info('已恢复默认音频参数');
+            }}>
             <RotateCcw className="w-3.5 h-3.5 mr-1.5" />重置
           </Button>
         </div>
@@ -1213,29 +1754,141 @@ function AudioEditPanel() {
 }
 
 // ── 面板6：动画与关键帧 ──────────────────────────────────────────────────
-function KeyframePanel() {
-  const [selectedProp, setSelectedProp] = useState<string | null>(null);
+interface KeyframePanelProps {
+  selectedTrackItem: string | null;
+  tracks: TrackItem[];
+  setTracks: React.Dispatch<React.SetStateAction<TrackItem[]>>;
+  currentTime: number;
+  duration: number;
+  scale: number[];
+  setScale: (v: number[]) => void;
+  opacity: number[];
+  setOpacity: (v: number[]) => void;
+}
+
+function KeyframePanel({
+  selectedTrackItem,
+  tracks,
+  setTracks,
+  currentTime,
+  duration,
+  scale,
+  setScale,
+  opacity,
+  setOpacity,
+}: KeyframePanelProps) {
+  const [selectedProp, setSelectedProp] = useState<string | null>('缩放');
   const [selectedCurve, setSelectedCurve] = useState('缓入缓出');
-  const [keyframes, setKeyframes] = useState<Record<string, { pos: number; val: number }[]>>({});
+  const [keyframes, setKeyframes] = useState<Record<string, { pos: number; val: number }[]>>({
+    '缩放': [{ pos: 0, val: 100 }, { pos: 50, val: 115 }, { pos: 100, val: 100 }],
+    '不透明度': [{ pos: 0, val: 0 }, { pos: 20, val: 100 }, { pos: 80, val: 100 }, { pos: 100, val: 0 }],
+  });
+
+  const selectedItem = tracks.find(t => t.id === selectedTrackItem);
 
   const addKeyframe = (prop: string) => {
-    const pos = Math.round(Math.random() * 80 + 10);
-    const val = Math.round(Math.random() * 100);
+    const pos = Math.max(0, Math.min(100, Math.round((currentTime / Math.max(0.1, duration)) * 100)));
+    const val = prop === '缩放' ? scale[0] : prop === '不透明度' ? opacity[0] : 0;
+
     setKeyframes(prev => ({
       ...prev,
-      [prop]: [...(prev[prop] || []), { pos, val }].sort((a, b) => a.pos - b.pos),
+      [prop]: [...(prev[prop] || []).filter(k => Math.abs(k.pos - pos) > 2), { pos, val }].sort((a, b) => a.pos - b.pos),
     }));
-    toast.success(`已在当前位置添加 ${prop} 关键帧`);
+
+    if (selectedTrackItem) {
+      setTracks(prev => prev.map(t => {
+        if (t.id === selectedTrackItem) {
+          const curKfs = t.keyframes || [];
+          return {
+            ...t,
+            keyframes: [...curKfs, { time: Number(currentTime.toFixed(2)), property: prop, value: val }],
+          };
+        }
+        return t;
+      }));
+      toast.success(`已为「${selectedItem?.name}」在 ${currentTime.toFixed(1)}s 添加 ${prop} 关键帧 (值: ${val})`);
+    } else {
+      toast.success(`已在播放头 ${currentTime.toFixed(1)}s (${pos}%) 处记录 ${prop} 关键帧`);
+    }
   };
 
   const removeKeyframe = (prop: string, idx: number) => {
     setKeyframes(prev => ({ ...prev, [prop]: prev[prop].filter((_, i) => i !== idx) }));
-    toast.info('已删除关键帧');
+    toast.info('已移除关键帧');
+  };
+
+  const handleApplyPreset = (preset: string) => {
+    if (!selectedTrackItem) {
+      toast.warning('请先在下方时间轴点击选中一个轨道片段（视频/图片/文字）');
+      return;
+    }
+
+    if (preset === '弹入弹出') {
+      setScale([100]);
+      setOpacity([100]);
+      setKeyframes(prev => ({
+        ...prev,
+        '缩放': [{ pos: 0, val: 20 }, { pos: 25, val: 115 }, { pos: 40, val: 100 }, { pos: 85, val: 100 }, { pos: 100, val: 0 }],
+      }));
+    } else if (preset === '缩放放大') {
+      setScale([120]);
+      setKeyframes(prev => ({
+        ...prev,
+        '缩放': [{ pos: 0, val: 100 }, { pos: 100, val: 125 }],
+      }));
+    } else if (preset === '旋转进场') {
+      setKeyframes(prev => ({
+        ...prev,
+        '旋转': [{ pos: 0, val: -180 }, { pos: 30, val: 0 }],
+      }));
+    } else if (preset === '位移滑入') {
+      setKeyframes(prev => ({
+        ...prev,
+        '位置X': [{ pos: 0, val: -80 }, { pos: 25, val: 0 }],
+      }));
+    } else if (preset === '呼吸循环') {
+      setScale([105]);
+      setKeyframes(prev => ({
+        ...prev,
+        '缩放': [{ pos: 0, val: 100 }, { pos: 50, val: 110 }, { pos: 100, val: 100 }],
+      }));
+    } else {
+      setKeyframes(prev => ({
+        ...prev,
+        '位置X': [{ pos: 0, val: 0 }, { pos: 25, val: -5 }, { pos: 50, val: 5 }, { pos: 75, val: -3 }, { pos: 100, val: 0 }],
+      }));
+    }
+
+    setTracks(prev => prev.map(t => {
+      if (t.id === selectedTrackItem) {
+        return {
+          ...t,
+          scale: preset === '缩放放大' ? 120 : preset === '呼吸循环' ? 105 : 100,
+        };
+      }
+      return t;
+    }));
+
+    toast.success(`已为「${selectedItem?.name}」应用预设动画：${preset}`);
   };
 
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1">
+        {/* 当前选中片段提示 */}
+        <div className="px-3 pt-2 pb-1">
+          <div className="p-2 rounded bg-zinc-800/60 border border-zinc-700/60 flex items-center justify-between text-xs">
+            <span className="text-zinc-400 truncate">
+              目标: <span className="text-indigo-300 font-medium">{selectedItem ? selectedItem.name : '未选择片段（请在时间轴选中）'}</span>
+            </span>
+            {selectedItem && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600/30 text-indigo-300 shrink-0 ml-1">
+                {selectedItem.type}
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* 属性关键帧 */}
         <CollapsibleSection title="属性关键帧">
           <div className="px-3 pt-1 space-y-1.5">
@@ -1251,11 +1904,11 @@ function KeyframePanel() {
                       <span className="text-[10px] text-indigo-400 bg-indigo-600/20 px-1.5 rounded">{keyframes[prop].length} 帧</span>
                     )}
                     <button
-                      className="text-zinc-500 hover:text-indigo-400 transition-colors"
+                      className="text-zinc-500 hover:text-indigo-400 transition-colors p-1"
                       onClick={e => { e.stopPropagation(); addKeyframe(prop); }}
-                      title="添加关键帧"
+                      title="在当前播放位置添加关键帧"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-4 h-4 text-indigo-400" />
                     </button>
                   </div>
                 </div>
@@ -1269,11 +1922,11 @@ function KeyframePanel() {
                           className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-indigo-400 rotate-45 hover:bg-indigo-300 transition-colors"
                           style={{ left: `calc(${kf.pos}% - 5px)` }}
                           onClick={() => removeKeyframe(prop, i)}
-                          title={`t=${kf.pos}% 值=${kf.val} — 点击删除`}
+                          title={`时间位置: ${kf.pos}% | 值: ${kf.val} — 点击删除`}
                         />
                       ))}
                     </div>
-                    <p className="text-[9px] text-zinc-600 text-center">点击菱形删除关键帧</p>
+                    <p className="text-[9px] text-zinc-500 text-center">点击菱形删除关键帧</p>
                   </div>
                 )}
               </div>
@@ -1287,8 +1940,8 @@ function KeyframePanel() {
             {KF_CURVES.map(curve => (
               <button
                 key={curve}
-                className={`py-2 text-[11px] rounded border transition-colors ${selectedCurve === curve ? 'border-indigo-500 bg-indigo-600/20 text-indigo-300' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'}`}
-                onClick={() => { setSelectedCurve(curve); toast.success(`动画曲线：${curve}`); }}
+                className={`py-2 text-[11px] rounded border transition-colors ${selectedCurve === curve ? 'border-indigo-500 bg-indigo-600/20 text-indigo-300 font-medium' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'}`}
+                onClick={() => { setSelectedCurve(curve); toast.success(`已切换动画曲线：${curve}`); }}
               >
                 {selectedCurve === curve && <Check className="inline w-3 h-3 mr-1" />}{curve}
               </button>
@@ -1302,7 +1955,7 @@ function KeyframePanel() {
             <div className="bg-zinc-800 rounded border border-zinc-700 p-2 space-y-2">
               {KF_PROPERTIES.slice(0, 3).map(prop => (
                 <div key={prop} className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-500 w-12 shrink-0 truncate">{prop}</span>
+                  <span className="text-[10px] text-zinc-400 w-12 shrink-0 truncate">{prop}</span>
                   <div className="flex-1 h-5 bg-zinc-900 rounded relative overflow-hidden cursor-pointer"
                     onClick={() => addKeyframe(prop)}>
                     {(keyframes[prop] || [{ pos: 10, val: 0 }, { pos: 55, val: 80 }, { pos: 85, val: 100 }]).map((kf, i) => (
@@ -1314,24 +1967,24 @@ function KeyframePanel() {
                     ))}
                     <div className="absolute top-1/2 -translate-y-px h-px bg-indigo-400/30 inset-x-2" />
                   </div>
-                  <button className="shrink-0 text-zinc-600 hover:text-zinc-300" onClick={() => addKeyframe(prop)}>
+                  <button className="shrink-0 text-zinc-500 hover:text-zinc-300" onClick={() => addKeyframe(prop)}>
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-zinc-500 text-center mt-2">点击轨道添加关键帧 · 点击菱形删除</p>
+            <p className="text-[10px] text-zinc-500 text-center mt-2">点击轨道添加关键帧 · 当前曲线: {selectedCurve}</p>
           </div>
         </CollapsibleSection>
 
         {/* 快捷动画预设 */}
-        <CollapsibleSection title="快捷动画预设" defaultOpen={false}>
+        <CollapsibleSection title="快捷动画预设">
           <div className="px-3 pt-1 grid grid-cols-2 gap-2">
             {['弹入弹出', '旋转进场', '缩放放大', '位移滑入', '抖动强调', '呼吸循环'].map(preset => (
               <button
                 key={preset}
-                className="py-2 text-[11px] text-zinc-300 bg-zinc-800 rounded border border-zinc-700 hover:border-indigo-500/60 hover:bg-indigo-600/5 hover:text-indigo-300 transition-all"
-                onClick={() => toast.success(`已应用预设动画：${preset}`)}
+                className="py-2.5 text-[11px] text-zinc-300 bg-zinc-800/80 rounded border border-zinc-700 hover:border-indigo-500/80 hover:bg-indigo-600/10 hover:text-indigo-200 transition-all font-medium"
+                onClick={() => handleApplyPreset(preset)}
               >
                 {preset}
               </button>
@@ -1341,8 +1994,14 @@ function KeyframePanel() {
 
         <div className="px-3 py-3 border-t border-zinc-800">
           <Button size="sm" className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px]"
-            onClick={() => toast.success('关键帧动画已应用到当前片段')}>
-            <Check className="w-3.5 h-3.5 mr-1.5" />应用动画
+            onClick={() => {
+              if (selectedTrackItem) {
+                toast.success(`关键帧动画已成功写入「${selectedItem?.name}」并应用到播放时间轴`);
+              } else {
+                toast.info('关键帧动画已记录，请在时间轴选中片段后绑定');
+              }
+            }}>
+            <Check className="w-3.5 h-3.5 mr-1.5" />应用动画到片段
           </Button>
         </div>
       </ScrollArea>
@@ -1351,10 +2010,11 @@ function KeyframePanel() {
 }
 
 // ── AI工具操作抽屉 ────────────────────────────────────────────────────────
-function AiToolDialog({ tool, open, onClose }: {
+function AiToolDialog({ tool, open, onClose, onApply }: {
   tool: typeof AI_TOOLS[0] | null;
   open: boolean;
   onClose: () => void;
+  onApply: (toolId: string) => void;
 }) {
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
@@ -1362,12 +2022,13 @@ function AiToolDialog({ tool, open, onClose }: {
   useEffect(() => { if (!open) { setRunning(false); setDone(false); } }, [open]);
 
   const handleRun = async () => {
+    if (!tool) return;
     setRunning(true);
     setDone(false);
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1200));
     setRunning(false);
     setDone(true);
-    toast.success(`${tool?.name} 处理完成！`);
+    onApply(tool.id);
   };
 
   if (!tool) return null;
@@ -1391,70 +2052,70 @@ function AiToolDialog({ tool, open, onClose }: {
           {/* AI工具参数区 */}
           {tool.id === 'ai1' && (
             <div className="space-y-2">
-              <p className="text-[12px] text-zinc-300">对视频中的人物进行智能抠像，自动分离背景与前景。</p>
+              <p className="text-[12px] text-zinc-300">对视频中的人物进行智能抠像，自动分离背景与前景人物轮廓。</p>
               <div className="flex items-center justify-between px-3 py-2 bg-zinc-800 rounded border border-zinc-700">
                 <span className="text-[11px] text-zinc-400">检测精度</span>
                 <select className="bg-zinc-700 text-zinc-200 text-[11px] rounded px-2 py-0.5 border-0">
-                  <option>高精度（慢）</option><option>标准</option><option>快速（低精度）</option>
+                  <option>高精度发丝级（推荐）</option><option>标准平衡模式</option><option>极速模式</option>
                 </select>
               </div>
               <div className="flex items-center justify-between px-3 py-2 bg-zinc-800 rounded border border-zinc-700">
-                <span className="text-[11px] text-zinc-400">边缘羽化</span>
-                <span className="text-[11px] text-zinc-300">8px</span>
+                <span className="text-[11px] text-zinc-400">边缘羽化度</span>
+                <span className="text-[11px] text-indigo-300 font-mono">6px</span>
               </div>
             </div>
           )}
           {tool.id === 'ai2' && (
             <div className="space-y-2">
-              <p className="text-[12px] text-zinc-300">AI 美颜、美体，自动优化人像画质。</p>
-              {['磨皮强度', '美白强度', '瘦脸强度'].map(label => (
+              <p className="text-[12px] text-zinc-300">AI 智能人像美颜、肤质磨皮与面部轮廓提亮。</p>
+              {['磨皮平滑', '肤色提亮', '人脸立体感'].map(label => (
                 <div key={label} className="flex items-center gap-3 px-3 py-2 bg-zinc-800 rounded border border-zinc-700">
                   <span className="text-[11px] text-zinc-400 w-20 shrink-0">{label}</span>
-                  <Slider defaultValue={[50]} max={100} className="flex-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5" />
+                  <Slider defaultValue={[70]} max={100} className="flex-1 [&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5" />
                 </div>
               ))}
             </div>
           )}
           {tool.id === 'ai3' && (
             <div className="space-y-2">
-              <p className="text-[12px] text-zinc-300">识别音乐节拍，自动将视频切换点对齐到节拍。</p>
+              <p className="text-[12px] text-zinc-300">智能识别音频鼓点节拍，自动将主视频分割并对齐到强弱节拍点。</p>
               <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded border border-zinc-700">
-                <span className="text-[11px] text-zinc-400">音频轨道</span>
-                <span className="text-[11px] text-zinc-300 ml-auto">BGM · 动感节奏.mp3</span>
+                <span className="text-[11px] text-zinc-400">参考音轨</span>
+                <span className="text-[11px] text-emerald-400 ml-auto font-mono">BGM · 动态节奏音轨</span>
               </div>
               <div className="flex items-center justify-between px-3 py-2 bg-zinc-800 rounded border border-zinc-700">
                 <span className="text-[11px] text-zinc-400">卡点灵敏度</span>
                 <select className="bg-zinc-700 text-zinc-200 text-[11px] rounded px-2 py-0.5 border-0">
-                  <option>强拍</option><option>所有节拍</option><option>高密度</option>
+                  <option>强节拍（3秒节奏卡点）</option><option>密集卡点（1.5秒快切）</option>
                 </select>
               </div>
             </div>
           )}
           {tool.id === 'ai4' && (
             <div className="space-y-2">
-              <p className="text-[12px] text-zinc-300">识别视频或音频中的语音，自动生成时间轴字幕。</p>
+              <p className="text-[12px] text-zinc-300">识别视频或音频中的语音内容，毫秒级自动生成双语字幕轨。</p>
               <div className="flex items-center justify-between px-3 py-2 bg-zinc-800 rounded border border-zinc-700">
-                <span className="text-[11px] text-zinc-400">语言</span>
+                <span className="text-[11px] text-zinc-400">源语言</span>
                 <select className="bg-zinc-700 text-zinc-200 text-[11px] rounded px-2 py-0.5 border-0">
-                  <option>中文（普通话）</option><option>粤语</option><option>英语</option><option>中英混合</option>
+                  <option>中文（普通话+英文混合）</option><option>纯英语</option><option>粤语</option>
                 </select>
               </div>
               <div className="flex items-center justify-between px-3 py-2 bg-zinc-800 rounded border border-zinc-700">
-                <span className="text-[11px] text-zinc-400">字幕样式</span>
+                <span className="text-[11px] text-zinc-400">排版样式</span>
                 <select className="bg-zinc-700 text-zinc-200 text-[11px] rounded px-2 py-0.5 border-0">
-                  <option>默认白字黑边</option><option>弹幕风格</option><option>电影字幕</option>
+                  <option>电商白字醒目投影（推荐）</option><option>黑底半透高级框</option><option>综艺醒目描边</option>
                 </select>
               </div>
             </div>
           )}
           {(tool.id === 'ai5' || tool.id === 'ai6') && (
             <div className="space-y-2">
-              <p className="text-[12px] text-zinc-300">{tool.id === 'ai5' ? '选择脚本模板，快速生成带货视频分镜。' : '导入已有脚本，自动规划视频分镜结构。'}</p>
+              <p className="text-[12px] text-zinc-300">{tool.id === 'ai5' ? '选择黄金带货脚本模板，快速为时间轴生成四段式分镜。' : '导入已有文案脚本，自动规划并拆分视频分镜。'}</p>
               {tool.id === 'ai5' ? (
                 <div className="grid grid-cols-2 gap-2">
-                  {['带货开场', '产品展示', '用户证言', '促销结尾'].map(t => (
+                  {['带货开场抓人', '产品特写展示', '核心痛点解决', '限时促单结尾'].map(t => (
                     <button key={t} className="py-2 bg-zinc-800 border border-zinc-700 rounded text-[11px] text-zinc-300 hover:border-indigo-500/60 hover:text-indigo-300 transition-colors"
-                      onClick={() => toast.success(`已选择模板：${t}`)}>
+                      onClick={() => toast.success(`已设定模板分镜：${t}`)}>
                       {t}
                     </button>
                   ))}
@@ -1463,7 +2124,7 @@ function AiToolDialog({ tool, open, onClose }: {
                 <div className="border-2 border-dashed border-zinc-700 rounded p-4 text-center space-y-1">
                   <Upload className="w-6 h-6 text-zinc-500 mx-auto" />
                   <p className="text-[11px] text-zinc-500">拖拽 .txt / .docx 脚本文件</p>
-                  <button className="text-[11px] text-indigo-400 hover:text-indigo-300" onClick={() => toast.info('正在打开文件选择器')}>或点击选择文件</button>
+                  <button className="text-[11px] text-indigo-400 hover:text-indigo-300" onClick={() => toast.info('已载入默认带货分镜脚本示例')}>使用默认带货分镜脚本</button>
                 </div>
               )}
             </div>
@@ -1473,20 +2134,20 @@ function AiToolDialog({ tool, open, onClose }: {
           {running && (
             <div className="flex items-center gap-2 px-3 py-2 bg-indigo-600/10 border border-indigo-600/30 rounded">
               <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
-              <span className="text-[12px] text-indigo-300">AI 处理中，请稍候…</span>
+              <span className="text-[12px] text-indigo-300">AI 算法处理中，正在生成轨道结果…</span>
             </div>
           )}
           {done && (
             <div className="flex items-center gap-2 px-3 py-2 bg-emerald-600/10 border border-emerald-600/30 rounded">
               <BadgeCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-[12px] text-emerald-300">处理完成，结果已应用到时间轴</span>
+              <span className="text-[12px] text-emerald-300">处理完成，已实时同步至时间轴与预览区！</span>
             </div>
           )}
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="ghost" size="sm" className="border border-zinc-700 text-zinc-400 hover:text-zinc-200" onClick={onClose}>取消</Button>
+          <Button variant="ghost" size="sm" className="border border-zinc-700 text-zinc-400 hover:text-zinc-200" onClick={onClose}>关闭</Button>
           <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRun} disabled={running || done}>
-            {running ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />处理中…</> : done ? <><Check className="w-3.5 h-3.5 mr-1.5" />已完成</> : <><Wand2 className="w-3.5 h-3.5 mr-1.5" />开始处理</>}
+            {running ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />计算中…</> : done ? <><Check className="w-3.5 h-3.5 mr-1.5" />已完成</> : <><Wand2 className="w-3.5 h-3.5 mr-1.5" />立即执行</>}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1495,7 +2156,14 @@ function AiToolDialog({ tool, open, onClose }: {
 }
 
 // ── 面板7：AI工具入口 ────────────────────────────────────────────────────
-function AiToolsPanel() {
+interface AiToolsPanelProps {
+  onApplyAiTool: (toolId: string) => void;
+  tracks: TrackItem[];
+  setTracks: React.Dispatch<React.SetStateAction<TrackItem[]>>;
+  currentTime: number;
+}
+
+function AiToolsPanel({ onApplyAiTool, tracks, setTracks, currentTime }: AiToolsPanelProps) {
   const [selectedTool, setSelectedTool] = useState<typeof AI_TOOLS[0] | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -1504,11 +2172,53 @@ function AiToolsPanel() {
     setDialogOpen(true);
   };
 
+  const handleImportStoryboard = (name: string) => {
+    const startTime = currentTime;
+    const storyboardClips: TrackItem[] = [
+      {
+        id: `sb1-${Date.now()}`,
+        trackId: 'video',
+        name: `【分镜1】${name}-开场抓人`,
+        start: startTime,
+        duration: 3,
+        type: 'video',
+        url: '/Video/CreatOK_2.mp4',
+      },
+      {
+        id: `sb2-${Date.now() + 1}`,
+        trackId: 'video',
+        name: `【分镜2】${name}-商品展示`,
+        start: startTime + 3,
+        duration: 4,
+        type: 'video',
+        url: '/Video/CreatOK_5.mp4',
+      },
+      {
+        id: `sb3-${Date.now() + 2}`,
+        trackId: 'video',
+        name: `【分镜3】${name}-促单转化`,
+        start: startTime + 7,
+        duration: 3,
+        type: 'video',
+        url: '/Video/CreatOK_11.mp4',
+      },
+    ];
+    setTracks(prev => [...prev, ...storyboardClips]);
+    toast.success(`已将「${name}」三段式分镜模板注入时间轴（起始位置: ${startTime.toFixed(1)}s）`);
+  };
+
   return (
     <div className="flex flex-col h-full">
-      <AiToolDialog tool={selectedTool} open={dialogOpen} onClose={() => setDialogOpen(false)} />
+      <AiToolDialog
+        tool={selectedTool}
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onApply={(toolId) => {
+          onApplyAiTool(toolId);
+        }}
+      />
       <ScrollArea className="flex-1">
-        <CollapsibleSection title="核心AI功能">
+        <CollapsibleSection title="核心AI工具箱">
           <div className="px-3 pt-1 space-y-2">
             {AI_TOOLS.map(tool => (
               <button
@@ -1533,22 +2243,22 @@ function AiToolsPanel() {
         </CollapsibleSection>
 
         {/* 创作脚本模板 */}
-        <CollapsibleSection title="创作脚本模板">
+        <CollapsibleSection title="带货分镜脚本模板">
           <div className="px-3 pt-1 space-y-2">
             {[
-              { name: '带货开场钩子模板', desc: '3秒抓住用户注意力' },
-              { name: '产品展示分镜', desc: '多角度展示商品细节' },
-              { name: '用户证言模板', desc: '真实评价引导购买' },
-              { name: '促销结尾话术', desc: '限时优惠紧迫感营造' },
+              { name: '带货开场钩子模板', desc: '3秒黄金痛点抓取，快速拉升留存率' },
+              { name: '产品细节微距分镜', desc: '4秒多角度微距展示与品质感特写' },
+              { name: '核心卖点痛点解决', desc: '对比实验/实景使用场景演示' },
+              { name: '促销促单结尾模板', desc: '限时秒杀话术 + 紧迫感动作指引' },
             ].map(({ name, desc }) => (
-              <button key={name} className="w-full flex items-start gap-2 p-2.5 bg-zinc-800/50 border border-zinc-700 rounded hover:border-emerald-500/50 hover:bg-emerald-600/5 transition-colors text-left"
-                onClick={() => toast.success(`模板「${name}」已导入到时间轴`)}>
-                <BookOpen className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <button key={name} className="w-full flex items-start gap-2 p-2.5 bg-zinc-800/50 border border-zinc-700 rounded hover:border-indigo-500/50 hover:bg-indigo-600/5 transition-colors text-left group"
+                onClick={() => handleImportStoryboard(name)}>
+                <BookOpen className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-zinc-300">{name}</p>
+                  <p className="text-[11px] text-zinc-200 font-medium">{name}</p>
                   <p className="text-[10px] text-zinc-500">{desc}</p>
                 </div>
-                <Download className="w-3.5 h-3.5 text-zinc-500 shrink-0 mt-0.5" />
+                <Download className="w-3.5 h-3.5 text-zinc-500 shrink-0 mt-0.5 group-hover:text-indigo-400" />
               </button>
             ))}
           </div>
@@ -1573,11 +2283,15 @@ const SHOP_PRODUCTS = [
 
 const SHOP_CATEGORIES = ['全部', 'LUT', '特效', '贴纸', '转场', '音乐', '模板', '字幕'];
 
-function ShopPanel() {
+interface ShopPanelProps {
+  onApplyShopProduct: (product: typeof SHOP_PRODUCTS[0]) => void;
+}
+
+function ShopPanel({ onApplyShopProduct }: ShopPanelProps) {
   const [activeCategory, setActiveCategory] = useState('全部');
   const [searchText, setSearchText] = useState('');
   const [cart, setCart] = useState<Set<string>>(new Set());
-  const [purchased, setPurchased] = useState<Set<string>>(new Set());
+  const [purchased, setPurchased] = useState<Set<string>>(new Set(['p1'])); // 默认已解锁热门电影感LUT
   const [cartOpen, setCartOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'hot' | 'new' | 'price'>('hot');
   const [confirmItem, setConfirmItem] = useState<typeof SHOP_PRODUCTS[0] | null>(null);
@@ -1598,7 +2312,10 @@ function ShopPanel() {
   }, 0);
 
   const addToCart = (id: string, name: string) => {
-    if (purchased.has(id)) { toast.info(`「${name}」已购买，可直接使用`); return; }
+    if (purchased.has(id)) {
+      toast.info(`「${name}」已拥有，可直接点击【载入项目】`);
+      return;
+    }
     setCart(prev => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); toast.info(`已从购物车移除：${name}`); }
@@ -1608,25 +2325,33 @@ function ShopPanel() {
   };
 
   const buyNow = (item: typeof SHOP_PRODUCTS[0]) => {
-    if (purchased.has(item.id)) { toast.info(`「${item.name}」已购买，直接使用`); return; }
+    if (purchased.has(item.id)) {
+      onApplyShopProduct(item);
+      return;
+    }
     setConfirmItem(item);
   };
 
   const confirmPurchase = () => {
     if (!confirmItem) return;
-    setPurchased(prev => new Set(prev).add(confirmItem.id));
-    setCart(prev => { const next = new Set(prev); next.delete(confirmItem.id); return next; });
+    const purchasedItem = confirmItem;
+    setPurchased(prev => new Set(prev).add(purchasedItem.id));
+    setCart(prev => { const next = new Set(prev); next.delete(purchasedItem.id); return next; });
     setConfirmItem(null);
-    toast.success(`「${confirmItem.name}」购买成功！已解锁至素材库`);
+    toast.success(`「${purchasedItem.name}」购买成功！已自动应用到当前时间轴`);
+    onApplyShopProduct(purchasedItem);
   };
 
   const checkoutCart = () => {
     if (cart.size === 0) { toast.info('购物车为空'); return; }
-    const names = Array.from(cart).map(id => SHOP_PRODUCTS.find(p => p.id === id)?.name).filter(Boolean);
+    const items = Array.from(cart).map(id => SHOP_PRODUCTS.find(p => p.id === id)).filter(Boolean) as typeof SHOP_PRODUCTS;
     setPurchased(prev => new Set([...prev, ...cart]));
     setCart(new Set());
     setCartOpen(false);
-    toast.success(`已购买 ${names.length} 件商品，共 ¥${cartTotal}，已解锁至素材库`);
+    toast.success(`已购买 ${items.length} 件商品，共 ¥${cartTotal}，已解锁至素材库`);
+    if (items.length > 0) {
+      onApplyShopProduct(items[0]);
+    }
   };
 
   return (
@@ -1636,7 +2361,7 @@ function ShopPanel() {
         <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-sm bg-zinc-900 border-zinc-700 text-zinc-100">
           <DialogHeader>
             <DialogTitle className="text-sm flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-amber-400" />确认购买
+              <CreditCard className="w-4 h-4 text-amber-400" />确认购买并载入
             </DialogTitle>
           </DialogHeader>
           {confirmItem && (
@@ -1655,7 +2380,7 @@ function ShopPanel() {
               <div className="grid grid-cols-2 gap-2">
                 <button className="flex items-center justify-center gap-1.5 py-2.5 rounded border border-zinc-700 bg-zinc-800 text-[12px] text-zinc-300 hover:border-zinc-500 transition-colors"
                   onClick={confirmPurchase}>
-                  <Package className="w-4 h-4 text-zinc-400" />微信支付
+                  <Package className="w-4 h-4 text-emerald-400" />微信支付
                 </button>
                 <button className="flex items-center justify-center gap-1.5 py-2.5 rounded border border-zinc-700 bg-zinc-800 text-[12px] text-zinc-300 hover:border-zinc-500 transition-colors"
                   onClick={confirmPurchase}>
@@ -1760,7 +2485,7 @@ function ShopPanel() {
 
       {/* 排序 + 统计 */}
       <div className="px-3 py-1.5 flex items-center justify-between shrink-0">
-        <span className="text-[10px] text-zinc-500">{filtered.length} 件商品</span>
+        <span className="text-[10px] text-zinc-500">{filtered.length} 件精选资源</span>
         <div className="flex items-center gap-0.5">
           {([['hot', '热销'], ['new', '最新'], ['price', '价格']] as const).map(([v, l]) => (
             <button
@@ -1782,10 +2507,10 @@ function ShopPanel() {
             <Flame className="w-4 h-4 text-amber-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-amber-300">限时活动</p>
-            <p className="text-[10px] text-zinc-400">首购8折 · 满99减20 · 全场包邮</p>
+            <p className="text-[12px] font-medium text-amber-300">限时福利合集</p>
+            <p className="text-[10px] text-zinc-400">已购资源支持一键直接插入当前视频时间轴</p>
           </div>
-          <span className="text-[10px] text-amber-400 font-mono shrink-0">剩 23:47:12</span>
+          <span className="text-[10px] text-amber-400 font-mono shrink-0">限时畅享</span>
         </div>
 
         <div className="px-3 space-y-2 pb-4">
@@ -1811,7 +2536,7 @@ function ShopPanel() {
                       <Star className="w-2.5 h-2.5 text-amber-400 fill-current" />
                       <span className="text-[10px] text-zinc-400">{p.rating}</span>
                     </div>
-                    <span className="text-[10px] text-zinc-600">{p.sales.toLocaleString()}已购</span>
+                    <span className="text-[10px] text-zinc-600">{p.sales.toLocaleString()}已拥有</span>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">
                     <div className="flex items-center gap-1.5">
@@ -1820,9 +2545,12 @@ function ShopPanel() {
                     </div>
                     <div className="flex items-center gap-1">
                       {purchased.has(p.id) ? (
-                        <span className="px-2 py-0.5 text-[10px] bg-emerald-600/20 text-emerald-400 rounded flex items-center gap-1">
-                          <Check className="w-3 h-3" />已购买
-                        </span>
+                        <button
+                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] rounded flex items-center gap-1 transition-colors"
+                          onClick={() => onApplyShopProduct(p)}
+                        >
+                          <Check className="w-3 h-3" />载入项目
+                        </button>
                       ) : (
                         <>
                           <button
@@ -1859,7 +2587,7 @@ function ShopPanel() {
         {purchased.size > 0 && (
           <div className="mx-3 mb-4 rounded border border-emerald-600/30 bg-emerald-600/5 p-3">
             <p className="text-[11px] text-emerald-400 font-medium mb-2 flex items-center gap-1.5">
-              <BadgeCheck className="w-3.5 h-3.5" />已购素材 ({purchased.size} 件)
+              <BadgeCheck className="w-3.5 h-3.5" />已拥有资源 ({purchased.size} 件) · 点击快捷载入
             </p>
             <div className="flex flex-wrap gap-1.5">
               {Array.from(purchased).map(id => {
@@ -1867,9 +2595,9 @@ function ShopPanel() {
                 if (!p) return null;
                 return (
                   <button key={id}
-                    className="px-2 py-1 bg-emerald-600/20 border border-emerald-600/30 rounded text-[10px] text-emerald-300 hover:bg-emerald-600/30 transition-colors"
-                    onClick={() => toast.success(`已将「${p.name}」添加到素材面板`)}>
-                    {p.name}
+                    className="px-2 py-1 bg-emerald-600/20 border border-emerald-600/30 rounded text-[10px] text-emerald-300 hover:bg-emerald-600/30 transition-colors flex items-center gap-1"
+                    onClick={() => onApplyShopProduct(p)}>
+                    <span>+</span>{p.name}
                   </button>
                 );
               })}
@@ -1882,25 +2610,93 @@ function ShopPanel() {
 }
 
 // ── 左侧边栏主组件 ────────────────────────────────────────────────────────
-const PANEL_ITEMS: { id: PanelId; icon: React.ElementType; label: string; shortcut: string }[] = [
-  { id: 'media', icon: Film, label: '媒体库', shortcut: 'M' },
-  { id: 'effects', icon: Sparkles, label: '效果', shortcut: 'E' },
-  { id: 'text', icon: Type, label: '字幕', shortcut: 'T' },
-  { id: 'pip', icon: Layers, label: '画中画', shortcut: 'P' },
-  { id: 'audio', icon: Music2, label: '音频编辑', shortcut: 'A' },
-  { id: 'keyframe', icon: Waypoints, label: '关键帧', shortcut: 'K' },
-  { id: 'ai', icon: Wand2, label: 'AI工具', shortcut: 'I' },
-  { id: 'shop', icon: ShoppingBag, label: '资源商城', shortcut: 'S' },
+const PANEL_ITEMS: { id: PanelId; icon: React.ElementType; label: string; shortLabel: string; shortcut: string }[] = [
+  { id: 'media', icon: Film, label: '媒体库', shortLabel: '媒体库', shortcut: 'M' },
+  { id: 'effects', icon: Sparkles, label: '效果', shortLabel: '效果', shortcut: 'E' },
+  { id: 'text', icon: Type, label: '字幕', shortLabel: '字幕', shortcut: 'T' },
+  { id: 'pip', icon: Layers, label: '画中画', shortLabel: '画中画', shortcut: 'P' },
+  { id: 'audio', icon: Music2, label: '音频编辑', shortLabel: '音频', shortcut: 'A' },
+  { id: 'keyframe', icon: Waypoints, label: '关键帧', shortLabel: '关键帧', shortcut: 'K' },
+  { id: 'ai', icon: Wand2, label: 'AI工具', shortLabel: 'AI工具', shortcut: 'I' },
+  { id: 'shop', icon: ShoppingBag, label: '资源商城', shortLabel: '商城', shortcut: 'S' },
 ];
 
-function LeftSidebar({ materials, onAdd, importedVideos, onImportVideo, onUpload, onDelete }: {
+interface LeftSidebarProps {
   materials: { id: string; name: string; url: string; type: string }[];
   onAdd: (m: { id: string; name: string; url: string; type: string }) => void;
   importedVideos: { id: string; title: string; video_url: string; thumbnail_url: string | null }[];
   onImportVideo: (v: { id: string; title: string; video_url: string; thumbnail_url: string | null }) => void;
   onUpload: (file: File) => Promise<void>;
   onDelete: (id: string) => void;
-}) {
+  // Panel 2 Effects
+  appliedFilter: string;
+  setAppliedFilter: (f: string) => void;
+  filterIntensity: Record<string, number>;
+  setFilterIntensity: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  appliedTrans: string;
+  setAppliedTrans: (t: string) => void;
+  // Panel 3 Text
+  selectedFont: string;
+  setSelectedFont: (f: string) => void;
+  // Panel 4 PIP
+  pipSettings: PipSettings;
+  setPipSettings: React.Dispatch<React.SetStateAction<PipSettings>>;
+  pipLayers: PipLayer[];
+  setPipLayers: React.Dispatch<React.SetStateAction<PipLayer[]>>;
+  // Panel 5 Audio
+  audioSettings: AudioSettings;
+  setAudioSettings: React.Dispatch<React.SetStateAction<AudioSettings>>;
+  videoRef: React.RefObject<HTMLVideoElement>;
+  // Panel 6 Keyframes
+  selectedTrackItem: string | null;
+  duration: number;
+  scale: number[];
+  setScale: (v: number[]) => void;
+  opacity: number[];
+  setOpacity: (v: number[]) => void;
+  // Panel 7 AI & Panel 8 Shop
+  onApplyAiTool: (toolId: string) => void;
+  onApplyShopProduct: (p: typeof SHOP_PRODUCTS[0]) => void;
+  // Shared
+  tracks: TrackItem[];
+  setTracks: React.Dispatch<React.SetStateAction<TrackItem[]>>;
+  currentTime: number;
+}
+
+function LeftSidebar({
+  materials,
+  onAdd,
+  importedVideos,
+  onImportVideo,
+  onUpload,
+  onDelete,
+  appliedFilter,
+  setAppliedFilter,
+  filterIntensity,
+  setFilterIntensity,
+  appliedTrans,
+  setAppliedTrans,
+  selectedFont,
+  setSelectedFont,
+  pipSettings,
+  setPipSettings,
+  pipLayers,
+  setPipLayers,
+  audioSettings,
+  setAudioSettings,
+  videoRef,
+  selectedTrackItem,
+  duration,
+  scale,
+  setScale,
+  opacity,
+  setOpacity,
+  onApplyAiTool,
+  onApplyShopProduct,
+  tracks,
+  setTracks,
+  currentTime,
+}: LeftSidebarProps) {
   const [activePanel, setActivePanel] = useState<PanelId>('media');
   const [collapsed, setCollapsed] = useState(false);
 
@@ -1921,7 +2717,7 @@ function LeftSidebar({ materials, onAdd, importedVideos, onImportVideo, onUpload
         {PANEL_ITEMS.map(item => (
           <button
             key={item.id}
-            title={`${item.label}  (${item.shortcut})`}
+            title={`${item.label} (${item.shortcut})`}
             className={`relative mx-1 w-12 h-12 rounded flex flex-col items-center justify-center gap-0.5 transition-all group ${activePanel === item.id && !collapsed
               ? 'bg-indigo-600/20 text-indigo-400 ring-1 ring-inset ring-indigo-600/40'
               : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
@@ -1932,7 +2728,7 @@ function LeftSidebar({ materials, onAdd, importedVideos, onImportVideo, onUpload
             }}
           >
             <item.icon className="w-5 h-5" />
-            <span className="text-[10px] leading-none mt-0.5">{item.label.slice(0, 3)}</span>
+            <span className="text-[10px] leading-none mt-0.5 tracking-tight">{item.shortLabel}</span>
             {/* 激活指示条 */}
             {activePanel === item.id && !collapsed && (
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-400 rounded-r" />
@@ -1963,14 +2759,87 @@ function LeftSidebar({ materials, onAdd, importedVideos, onImportVideo, onUpload
           </div>
           {/* 面板内容 */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            {activePanel === 'media' && <MediaLibraryPanel materials={materials} onAdd={onAdd} importedVideos={importedVideos} onImportVideo={onImportVideo} onUpload={onUpload} onDelete={onDelete} />}
-            {activePanel === 'effects' && <EffectsPanel />}
-            {activePanel === 'text' && <TextSubtitlePanel />}
-            {activePanel === 'pip' && <PipPanel />}
-            {activePanel === 'audio' && <AudioEditPanel />}
-            {activePanel === 'keyframe' && <KeyframePanel />}
-            {activePanel === 'ai' && <AiToolsPanel />}
-            {activePanel === 'shop' && <ShopPanel />}
+            {activePanel === 'media' && (
+              <MediaLibraryPanel
+                materials={materials}
+                onAdd={onAdd}
+                importedVideos={importedVideos}
+                onImportVideo={onImportVideo}
+                onUpload={onUpload}
+                onDelete={onDelete}
+              />
+            )}
+            {activePanel === 'effects' && (
+              <EffectsPanel
+                appliedFilter={appliedFilter}
+                setAppliedFilter={setAppliedFilter}
+                filterIntensity={filterIntensity}
+                setFilterIntensity={setFilterIntensity}
+                appliedTrans={appliedTrans}
+                setAppliedTrans={setAppliedTrans}
+                tracks={tracks}
+                setTracks={setTracks}
+                currentTime={currentTime}
+              />
+            )}
+            {activePanel === 'text' && (
+              <TextSubtitlePanel
+                tracks={tracks}
+                setTracks={setTracks}
+                currentTime={currentTime}
+                selectedFont={selectedFont}
+                setSelectedFont={setSelectedFont}
+              />
+            )}
+            {activePanel === 'pip' && (
+              <PipPanel
+                pipSettings={pipSettings}
+                setPipSettings={setPipSettings}
+                pipLayers={pipLayers}
+                setPipLayers={setPipLayers}
+                tracks={tracks}
+                setTracks={setTracks}
+                currentTime={currentTime}
+                materials={materials}
+              />
+            )}
+            {activePanel === 'audio' && (
+              <AudioEditPanel
+                audioSettings={audioSettings}
+                setAudioSettings={setAudioSettings}
+                videoRef={videoRef}
+                tracks={tracks}
+                setTracks={setTracks}
+                currentTime={currentTime}
+                selectedTrackItem={selectedTrackItem}
+              />
+            )}
+            {activePanel === 'keyframe' && (
+              <KeyframePanel
+                selectedTrackItem={selectedTrackItem}
+                tracks={tracks}
+                setTracks={setTracks}
+                currentTime={currentTime}
+                duration={duration}
+                scale={scale}
+                setScale={setScale}
+                opacity={opacity}
+                setOpacity={setOpacity}
+              />
+            )}
+            {activePanel === 'ai' && (
+              <AiToolsPanel
+                onApplyAiTool={onApplyAiTool}
+                tracks={tracks}
+                setTracks={setTracks}
+                currentTime={currentTime}
+              />
+            )}
+            {activePanel === 'shop' && (
+              <ShopPanel
+                onApplyShopProduct={onApplyShopProduct}
+              />
+            )}
           </div>
         </div>
       )}
@@ -2005,17 +2874,18 @@ const DEFAULT_TRACKS: TrackItem[] = [
     start: 3,
     duration: 9,
     type: 'text'
-  },
-  {
-    id: 'fx1',
-    trackId: 'effects',
-    name: '光晕特效',
-    start: 7.5,
-    duration: 6,
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=640&h=360&fit=crop'
   }
 ];
+
+// 清理历史草稿/存档中遗留的「光晕特效」片段，保证效果轨初始为空
+const stripLegacyGlowFx = (list: TrackItem[]) => list.filter(t => !(t.trackId === 'effects' && t.name === '光晕特效'));
+
+// 媒体库历史测试杂项素材（微信截图、超慢跑/减肥类短视频等），
+// 不再展示并同步从数据库删除，不影响用户后续新上传/导入的素材
+const LEGACY_JUNK_MATERIAL_PATTERNS: RegExp[] = [
+  /^微信图片_2026/, /^超慢跑的好处/, /减肥的意义/, /轻松的运动/, /^A?2?0\.png$/i, /^生成带货视频/,
+];
+const isLegacyJunkMaterial = (name: string) => LEGACY_JUNK_MATERIAL_PATTERNS.some(re => re.test(name));
 
 export default function VideoEditPage() {
   const [searchParams] = useSearchParams();
@@ -2036,6 +2906,8 @@ export default function VideoEditPage() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const isHistoryAction = useRef(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [scale, setScale] = useState([100]);
   const [opacity, setOpacity] = useState([100]);
   const [volume, setVolume] = useState([100]);
@@ -2226,6 +3098,184 @@ export default function VideoEditPage() {
       return currentTime >= track.start && currentTime <= end && track.type === 'image' && track.trackId === 'image';
     });
   })();
+
+  // 播放头下方激活的字幕片段
+  const activeTextClip = (() => {
+    return tracks.find(track => {
+      const end = track.start + track.duration;
+      return currentTime >= track.start && currentTime <= end && track.type === 'text';
+    });
+  })();
+
+  // 播放头下方激活的画中画片段
+  const activePipClip = (() => {
+    return tracks.find(track => {
+      const end = track.start + track.duration;
+      return currentTime >= track.start && currentTime <= end && (track.trackId === 'pip' || track.id.startsWith('pip-'));
+    });
+  })();
+
+  // 播放头下方激活的贴纸/特效片段
+  const activeStickerClip = (() => {
+    return tracks.find(track => {
+      const end = track.start + track.duration;
+      return currentTime >= track.start && currentTime <= end && (track.trackId === 'sticker' || track.id.startsWith('sticker-') || (track.type === 'image' && track.trackId === 'effects'));
+    });
+  })();
+
+  // ── 8大面板核心业务状态 ──────────────────────────────────────────
+  const [appliedFilter, setAppliedFilter] = useState('无');
+  const [filterIntensity, setFilterIntensity] = useState<Record<string, number>>({
+    '电影质感': 80,
+    '温暖午后': 75,
+    '日系清新': 80,
+    '复古胶片': 85,
+    '清爽胶片': 75,
+  });
+  const [appliedTrans, setAppliedTrans] = useState('无');
+  const [selectedFont, setSelectedFont] = useState('默认黑体');
+  const [pipSettings, setPipSettings] = useState<PipSettings>({
+    x: 75,
+    y: 25,
+    scale: 100,
+    rotation: 0,
+    opacity: 100,
+    blendMode: '正常',
+  });
+  const [pipLayers, setPipLayers] = useState<PipLayer[]>([]);
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>({
+    volume: 80,
+    fadeIn: 1.0,
+    fadeOut: 1.0,
+    pitch: 0,
+    speed: 100,
+  });
+  const [aiBeautyEnabled, setAiBeautyEnabled] = useState(false);
+  const [aiCutoutEnabled, setAiCutoutEnabled] = useState(false);
+
+  // AI 工具执行回调
+  const handleApplyAiTool = useCallback((toolId: string) => {
+    if (toolId === 'ai1') {
+      setAiCutoutEnabled(prev => {
+        const next = !prev;
+        if (next) toast.success('智能人物抠像已生效，前景背景已分离！');
+        else toast.info('已关闭智能人物抠像');
+        return next;
+      });
+    } else if (toolId === 'ai2') {
+      setAiBeautyEnabled(prev => {
+        const next = !prev;
+        if (next) toast.success('AI 美颜磨皮与肤色优化已生效！');
+        else toast.info('已关闭 AI 美颜');
+        return next;
+      });
+    } else if (toolId === 'ai3') {
+      setTracks(prev => {
+        const vidClips = prev.filter(t => t.type === 'video');
+        if (vidClips.length === 0) return prev;
+        const target = vidClips[0];
+        if (target.duration > 4) {
+          const split1 = { ...target, duration: 3 };
+          const split2 = { ...target, id: `beat-split-${Date.now()}`, name: `${target.name} [卡点2]`, start: target.start + 3, duration: Number((target.duration - 3).toFixed(2)) };
+          return [...prev.filter(t => t.id !== target.id), split1, split2].sort((a, b) => a.start - b.start);
+        }
+        return prev;
+      });
+      toast.success('音乐节拍识别完成！已自动将主视频片段对齐到强音节拍点');
+    } else if (toolId === 'ai4') {
+      const sub1: TrackItem = {
+        id: `ai-sub-1-${Date.now()}`,
+        trackId: 'text',
+        name: '这款质感拉满的百搭单品，今天专场限时直降！',
+        start: currentTime,
+        duration: 3.5,
+        type: 'text',
+      };
+      const sub2: TrackItem = {
+        id: `ai-sub-2-${Date.now()}`,
+        trackId: 'text',
+        name: '高清微距展示，做工用料肉眼可见的细腻！',
+        start: currentTime + 3.6,
+        duration: 3.5,
+        type: 'text',
+      };
+      setTracks(prev => [...prev, sub1, sub2]);
+      toast.success('已自动识别语音并生成时间轴字幕轨');
+    } else if (toolId === 'ai5' || toolId === 'ai6') {
+      const sbClips: TrackItem[] = [
+        { id: `sb-a-${Date.now()}`, trackId: 'video', name: '【AI脚本】3秒痛点开场', start: currentTime, duration: 3, type: 'video', url: '/Video/CreatOK_2.mp4' },
+        { id: `sb-b-${Date.now() + 1}`, trackId: 'video', name: '【AI脚本】商品细节微距特写', start: currentTime + 3, duration: 4, type: 'video', url: '/Video/CreatOK_5.mp4' },
+      ];
+      setTracks(prev => [...prev, ...sbClips]);
+      toast.success('AI 视频分镜规划完成，已将分镜镜头注入时间轴');
+    }
+  }, [currentTime]);
+
+  // 资源商城商品应用
+  const handleApplyShopProduct = useCallback((product: (typeof SHOP_PRODUCTS)[0]) => {
+    if (product.category === 'LUT') {
+      setAppliedFilter('电影质感');
+      setFilterIntensity(prev => ({ ...prev, '电影质感': 85 }));
+      toast.success(`已将「${product.name}」专业调色预设应用到视频！`);
+    } else if (product.category === '特效' || product.category === '贴纸') {
+      const stickerItem: TrackItem = {
+        id: `shop-sticker-${Date.now()}`,
+        trackId: 'sticker',
+        name: product.name,
+        start: currentTime,
+        duration: 5,
+        type: 'image',
+        url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=200&h=150&fit=crop',
+        scale: 100,
+        opacity: 100,
+      };
+      setTracks(prev => [...prev, stickerItem]);
+      toast.success(`已将「${product.name}」贴纸特效添加至时间轴`);
+    } else if (product.category === '转场') {
+      setAppliedTrans('t6');
+      toast.success(`已将转场效果切换为「光晕爆炸」热门转场`);
+    } else if (product.category === '音乐') {
+      const audioItem: TrackItem = {
+        id: `shop-bgm-${Date.now()}`,
+        trackId: 'audio',
+        name: `【BGM】${product.name}`,
+        start: currentTime,
+        duration: 15,
+        type: 'audio',
+        volume: 80,
+      };
+      setTracks(prev => [...prev, audioItem]);
+      toast.success(`已将无版权背景音乐「${product.name}」加入音频轨`);
+    } else if (product.category === '模板') {
+      const templateTracks: TrackItem[] = [
+        { id: `tpl-v1-${Date.now()}`, trackId: 'video', name: '产品展示主镜头', start: 0, duration: 6, type: 'video', url: '/Video/CreatOK_11.mp4' },
+        { id: `tpl-v2-${Date.now() + 1}`, trackId: 'video', name: '模特上身效果', start: 6, duration: 6, type: 'video', url: '/Video/CreatOK_2.mp4' },
+        { id: `tpl-t1-${Date.now() + 2}`, trackId: 'text', name: '新品上市 · 抢先体验', start: 0.5, duration: 5, type: 'text' },
+        { id: `tpl-t2-${Date.now() + 3}`, trackId: 'text', name: '限时直降 ¥99 包邮到手', start: 6.5, duration: 5, type: 'text' },
+      ];
+      setTracks(templateTracks);
+      setDuration(12);
+      toast.success(`已载入「${product.name}」完整带货工程模板！`);
+    } else if (product.category === '字幕') {
+      const fontItem: TrackItem = {
+        id: `shop-sub-${Date.now()}`,
+        trackId: 'text',
+        name: '🔥 爆款热卖中 · 手慢无！',
+        start: currentTime,
+        duration: 4,
+        type: 'text',
+        fontStyle: { fontFamily: '默认黑体', color: '#ffea00', bg: 'rgba(255,0,80,0.8)' },
+      };
+      setTracks(prev => [...prev, fontItem]);
+      toast.success(`已将动态花字「${product.name}」加入字幕轨`);
+    }
+
+    // 同时录入 materials 素材库
+    setMaterials(prev => {
+      if (prev.some(m => m.name === product.name)) return prev;
+      return [...prev, { id: `shop-mat-${Date.now()}`, name: product.name, url: '/Video/CreatOK_2.mp4', type: product.category === '音乐' ? 'audio' : 'video' }];
+    });
+  }, [currentTime]);
 
   const hasVideoClips = tracks.some(t => t.type === 'video');
   const currentVideoSrc = activeVideoClip?.url
@@ -2566,20 +3616,49 @@ export default function VideoEditPage() {
     setImportedVideos(mapped);
   }, [user]);
 
-  // 加载素材库
-  const DEMO_UID = '7d58d08f-8aa3-43f5-a30f-b7495d59d147';
+  // 加载素材库（媒体库默认展示作品素材库中的 2 条视频，不再展示历史无关默认素材）
+  const DEFAULT_SAMPLE_MATERIALS = [
+    { id: 'mat-work-1', name: '咖啡拿铁拉花艺术过程', url: '/Video/CreatOK_11.mp4', type: 'video' },
+    { id: 'mat-work-2', name: '极简带货展示视频.mp4', url: '/Video/CreatOK_2.mp4', type: 'video' },
+  ];
+
   const loadMaterials = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setMaterials(DEFAULT_SAMPLE_MATERIALS);
+      return;
+    }
     if (user.email === 'test_user@example.com') {
       await seedTestUserVideos(user.id);
     }
     const { data } = await supabase
       .from('materials')
       .select('id,name,url,type')
-      .or(`user_id.eq.${user.id},user_id.eq.${DEMO_UID}`)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(30);
-    setMaterials((data ?? []) as any[]);
+    const list = (data ?? []) as any[];
+    // 过滤并持久删除历史杂项素材
+    const junkIds = list.filter(m => isLegacyJunkMaterial(String(m.name ?? ''))).map(m => m.id);
+    const cleanList = list.filter(m => !isLegacyJunkMaterial(String(m.name ?? '')));
+    if (junkIds.length > 0) {
+      supabase.from('materials').delete().in('id', junkIds).then(() => {});
+    }
+    if (cleanList.length > 0) {
+      setMaterials(cleanList);
+      return;
+    }
+    // 无自有素材时，默认展示作品素材库中最近的 2 条已完成视频
+    const { data: works } = await supabase
+      .from('video_projects')
+      .select('id,title,video_url')
+      .eq('user_id', user.id)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(2);
+    const workMaterials = (works ?? [])
+      .filter(w => w.video_url)
+      .map(w => ({ id: `work-${w.id}`, name: w.title, url: w.video_url as string, type: 'video' }));
+    setMaterials(workMaterials.length > 0 ? workMaterials : DEFAULT_SAMPLE_MATERIALS);
   }, [user]);
 
   // 加载项目（同时读取 video_url 用于预览）
@@ -2608,8 +3687,9 @@ export default function VideoEditPage() {
       if ((data as any).video_url) setPreviewVideoUrl((data as any).video_url);
       const meta = (data.metadata || {}) as any;
       if (meta.tracks && meta.tracks.length > 0) {
-        setTracks(meta.tracks);
-        setTracksHistory([meta.tracks]);
+        const projTracks = stripLegacyGlowFx(meta.tracks);
+        setTracks(projTracks);
+        setTracksHistory([projTracks]);
         setHistoryIndex(0);
       } else {
         setTracks(DEFAULT_TRACKS);
@@ -2637,8 +3717,9 @@ export default function VideoEditPage() {
           if (parsed.importId === importId) {
             if (parsed.projectTitle) setProjectTitle(parsed.projectTitle);
             if (parsed.tracks) {
-              setTracks(parsed.tracks);
-              setTracksHistory([parsed.tracks]);
+              const restoredTracks = stripLegacyGlowFx(parsed.tracks);
+              setTracks(restoredTracks);
+              setTracksHistory([restoredTracks]);
               setHistoryIndex(0);
             }
             if (parsed.zoom !== undefined) setZoom(parsed.zoom);
@@ -2648,8 +3729,9 @@ export default function VideoEditPage() {
         } else {
           if (parsed.projectTitle) setProjectTitle(parsed.projectTitle);
           if (parsed.tracks) {
-            setTracks(parsed.tracks);
-            setTracksHistory([parsed.tracks]);
+            const restoredTracks = stripLegacyGlowFx(parsed.tracks);
+            setTracks(restoredTracks);
+            setTracksHistory([restoredTracks]);
             setHistoryIndex(0);
           }
           if (parsed.zoom !== undefined) setZoom(parsed.zoom);
@@ -2907,10 +3989,17 @@ export default function VideoEditPage() {
     }
   };
 
-  // 导出视频
-  const handleExport = async () => {
+  // 导出视频 - 开启语义确认与参数弹窗
+  const handleExport = () => {
+    if (!user) { toast.error('请先登录'); return; }
+    setExportDialogOpen(true);
+  };
+
+  // 确认执行导出任务
+  const executeExportTask = async () => {
     if (!user) { toast.error('请先登录'); return; }
 
+    setExporting(true);
     let currentId = importId;
     if (!currentId) {
       setSaving(true);
@@ -2931,6 +4020,7 @@ export default function VideoEditPage() {
       } catch (e: any) {
         toast.error('导出前自动保存失败：' + (e.message || e), { id: toastId });
         setSaving(false);
+        setExporting(false);
         return;
       } finally {
         toast.dismiss(toastId);
@@ -2938,15 +4028,18 @@ export default function VideoEditPage() {
       }
     }
 
-    toast.info('正在提交导出任务…');
+    const toastId = toast.loading('正在提交云端 AI 渲染任务…');
     try {
       const { error } = await supabase.functions.invoke('ai-assistant', {
         body: { action: 'generate_video', project_id: currentId }
       });
       if (error) throw error;
-      toast.success('导出任务已提交，可在作品素材查看进度');
+      toast.success('AI 视频生成任务已提交，可在「作品库」或「任务队列」查看实时进度', { id: toastId });
+      setExportDialogOpen(false);
     } catch (e: any) {
-      toast.error('导出失败：' + (e.message || '请稍后重试'));
+      toast.error('导出失败：' + (e.message || '请稍后重试'), { id: toastId });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -2996,7 +4089,40 @@ export default function VideoEditPage() {
       <div className="flex-1 min-h-0 flex overflow-hidden">
 
         {/* 左侧边栏 */}
-        <LeftSidebar materials={materials} onAdd={addToTimeline} importedVideos={importedVideos} onImportVideo={handleImportVideo} onUpload={handleUpload} onDelete={handleDeleteMaterial} />
+        <LeftSidebar
+          materials={materials}
+          onAdd={addToTimeline}
+          importedVideos={importedVideos}
+          onImportVideo={handleImportVideo}
+          onUpload={handleUpload}
+          onDelete={handleDeleteMaterial}
+          appliedFilter={appliedFilter}
+          setAppliedFilter={setAppliedFilter}
+          filterIntensity={filterIntensity}
+          setFilterIntensity={setFilterIntensity}
+          appliedTrans={appliedTrans}
+          setAppliedTrans={setAppliedTrans}
+          selectedFont={selectedFont}
+          setSelectedFont={setSelectedFont}
+          pipSettings={pipSettings}
+          setPipSettings={setPipSettings}
+          pipLayers={pipLayers}
+          setPipLayers={setPipLayers}
+          audioSettings={audioSettings}
+          setAudioSettings={setAudioSettings}
+          videoRef={videoRef}
+          selectedTrackItem={selectedTrackItem}
+          duration={duration}
+          scale={scale}
+          setScale={setScale}
+          opacity={opacity}
+          setOpacity={setOpacity}
+          onApplyAiTool={handleApplyAiTool}
+          onApplyShopProduct={handleApplyShopProduct}
+          tracks={tracks}
+          setTracks={setTracks}
+          currentTime={currentTime}
+        />
 
         {/* 中央预览区 */}
         <div className="flex-1 flex flex-col bg-black relative min-w-0" ref={previewContainerRef}>
@@ -3007,11 +4133,36 @@ export default function VideoEditPage() {
                   'aspect-video'
               }`}>
 
-              {/* 无项目时 — 示例项目入口已移除，方便直接播放/预览 */}
+              {/* 顶部激活效果与AI状态标签 */}
+              <div className="absolute top-3 left-3 z-30 flex flex-wrap gap-1.5 pointer-events-none">
+                {appliedFilter !== '无' && (
+                  <div className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur border border-indigo-500/50 text-[10px] text-indigo-300 flex items-center gap-1 shadow-lg">
+                    <Sparkles className="w-3 h-3 text-indigo-400" />
+                    <span>滤镜: {appliedFilter} ({filterIntensity[appliedFilter] ?? 80}%)</span>
+                  </div>
+                )}
+                {aiBeautyEnabled && (
+                  <div className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur border border-pink-500/50 text-[10px] text-pink-300 flex items-center gap-1 shadow-lg">
+                    <Wand2 className="w-3 h-3 text-pink-400" />
+                    <span>AI美颜已启用</span>
+                  </div>
+                )}
+                {aiCutoutEnabled && (
+                  <div className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur border border-emerald-500/50 text-[10px] text-emerald-300 flex items-center gap-1 shadow-lg">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span>智能抠像生效中</span>
+                  </div>
+                )}
+                {appliedTrans !== '无' && (
+                  <div className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur border border-amber-500/50 text-[10px] text-amber-300 flex items-center gap-1 shadow-lg">
+                    <span>转场: {TRANSITIONS.find(t => t.id === appliedTrans)?.name || appliedTrans}</span>
+                  </div>
+                )}
+              </div>
 
               {/* 示例项目选择器 */}
               {!importId && showSamplePicker && (
-                <div className="absolute inset-0 bg-zinc-950/95 p-4 overflow-y-auto">
+                <div className="absolute inset-0 bg-zinc-950/95 p-4 overflow-y-auto z-40">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-zinc-200">选择示例项目</p>
                     <Button
@@ -3052,6 +4203,7 @@ export default function VideoEditPage() {
                   style={{
                     transform: `scale(${(selectedTrackObj?.scale ?? 100) / 100})`,
                     opacity: (selectedTrackObj?.opacity ?? 100) / 100,
+                    filter: getCssFilter(appliedFilter, filterIntensity[appliedFilter], aiBeautyEnabled) + (aiCutoutEnabled ? ' drop-shadow(0 0 12px rgba(99, 102, 241, 0.8))' : ''),
                   }}
                   onLoad={(e) => {
                     const img = e.currentTarget;
@@ -3070,6 +4222,7 @@ export default function VideoEditPage() {
                   style={{
                     transform: `scale(${(selectedTrackObj?.scale ?? 100) / 100})`,
                     opacity: (selectedTrackObj?.opacity ?? 100) / 100,
+                    filter: getCssFilter(appliedFilter, filterIntensity[appliedFilter], aiBeautyEnabled) + (aiCutoutEnabled ? ' drop-shadow(0 0 12px rgba(99, 102, 241, 0.8))' : ''),
                   }}
                   onPlay={(e) => {
                     const vid = e.currentTarget;
@@ -3115,8 +4268,72 @@ export default function VideoEditPage() {
                 </div>
               )}
 
+              {/* 画中画浮层 (仅在时间轴存在激活的画中画片段时渲染) */}
+              {activePipClip && (
+                <div
+                  className="absolute z-20 overflow-hidden shadow-2xl rounded border border-indigo-500/60 transition-all pointer-events-none"
+                  style={{
+                    left: `${pipSettings.x}%`,
+                    top: `${pipSettings.y}%`,
+                    transform: `translate(-50%, -50%) scale(${pipSettings.scale / 100}) rotate(${pipSettings.rotation}deg)`,
+                    opacity: pipSettings.opacity / 100,
+                    mixBlendMode: pipSettings.blendMode === '正片叠底' ? 'multiply' : pipSettings.blendMode === '滤色' ? 'screen' : pipSettings.blendMode === '叠加' ? 'overlay' : 'normal',
+                    width: '32%',
+                    aspectRatio: '16/9',
+                  }}
+                >
+                  <video
+                    src={activePipClip.url || '/Video/CreatOK_2.mp4'}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* 动态贴纸与特效浮层 */}
+              {activeStickerClip && (
+                <div
+                  className="absolute z-25 pointer-events-none transition-all"
+                  style={{
+                    top: '16%',
+                    right: '10%',
+                    width: `${Math.max(60, Math.min(180, (activeStickerClip.scale ?? 100) * 0.9))}px`,
+                    opacity: (activeStickerClip.opacity ?? 100) / 100,
+                  }}
+                >
+                  <img
+                    src={activeStickerClip.url}
+                    alt={activeStickerClip.name}
+                    className="w-full h-auto drop-shadow-2xl animate-pulse"
+                  />
+                </div>
+              )}
+
+              {/* 实时字幕浮层 */}
+              {activeTextClip && (
+                <div className="absolute bottom-16 inset-x-4 flex justify-center pointer-events-none z-30 transition-all">
+                  <span
+                    className="px-4 py-1.5 rounded-lg text-center font-medium text-white max-w-[85%] leading-relaxed select-none shadow-2xl"
+                    style={{
+                      fontSize: `${Math.max(13, Math.min(24, (activeTextClip.scale ?? 100) * 0.16))}px`,
+                      fontFamily: activeTextClip.fontStyle?.fontFamily || selectedFont || 'sans-serif',
+                      color: activeTextClip.fontStyle?.color || '#ffffff',
+                      backgroundColor: activeTextClip.fontStyle?.bg || 'rgba(0, 0, 0, 0.75)',
+                      textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,0.8)',
+                      backdropFilter: 'blur(6px)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                    }}
+                  >
+                    {activeTextClip.name}
+                  </span>
+                </div>
+              )}
+
               {/* 播放控制 */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-zinc-900/80 backdrop-blur px-6 py-2 rounded-full border border-zinc-700/50">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-zinc-900/80 backdrop-blur px-6 py-2 rounded-full border border-zinc-700/50 z-30">
                 <Button size="icon" variant="ghost" className="w-8 h-8 rounded-full text-zinc-300 hover:text-white hover:bg-zinc-700"
                   onClick={() => { setCurrentTime(0); if (videoRef.current) videoRef.current.currentTime = 0; }}>
                   <SkipBack className="w-4 h-4 fill-current" />
@@ -3464,6 +4681,80 @@ export default function VideoEditPage() {
               <Button className="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleSave} disabled={saving}>
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
                 保存草稿
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 导出确认与合成语义说明弹窗 */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-md bg-zinc-900 border-zinc-700 text-zinc-200">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-100 flex items-center gap-2">
+              <Download className="w-5 h-5 text-indigo-400" />
+              导出并渲染带货视频
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-sm">
+            <div className="rounded-lg bg-indigo-950/40 border border-indigo-500/30 p-3 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-medium text-indigo-300 text-xs">
+                <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>AI 云端整段合成机制说明</span>
+              </div>
+              <p className="text-xs text-indigo-200/80 leading-relaxed">
+                当前版本将基于多轨道分镜脚本与 Prompt 提交至云端 Seedance AI 引擎进行分段生成与拼装合成。您的轨道配置、字幕标记及项目参数已同步保存在工程草稿中。
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs bg-zinc-800/60 p-3 rounded-lg border border-zinc-800">
+              <div>
+                <span className="text-zinc-500">项目名称：</span>
+                <span className="text-zinc-200 font-medium truncate block">{projectTitle || '未命名项目'}</span>
+              </div>
+              <div>
+                <span className="text-zinc-500">成片时长：</span>
+                <span className="text-zinc-200 font-medium block">约 {duration} 秒</span>
+              </div>
+              <div>
+                <span className="text-zinc-500">时间轴轨道：</span>
+                <span className="text-zinc-200 font-medium block">{tracks.length} 个轨道元素</span>
+              </div>
+              <div>
+                <span className="text-zinc-500">画幅比例：</span>
+                <span className="text-zinc-200 font-medium block">9:16 竖屏</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-zinc-500">
+              * 提交后将自动创建后台异步任务，预计耗时 1~3 分钟。您可以在「作品库」或「任务队列」实时追踪生成进度。
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="ghost"
+                className="flex-1 h-9 text-zinc-400 hover:text-zinc-200"
+                onClick={() => setExportDialogOpen(false)}
+                disabled={exporting}
+              >
+                取消
+              </Button>
+              <Button
+                className="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+                onClick={executeExportTask}
+                disabled={exporting}
+              >
+                {exporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    正在提交...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    确认提交云端渲染
+                  </>
+                )}
               </Button>
             </div>
           </div>

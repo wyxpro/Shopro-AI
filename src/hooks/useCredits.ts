@@ -1,10 +1,14 @@
 /**
- * useCredits - 积分余额实时查询 Hook（P1-M04）
+ * useCredits - 积分余额实时查询与原子扣减 Hook（P0-核心闭环）
+ *
+ * 规则口径：新用户注册默认 20 积分；视频生成固定消耗 10 积分/次（见 creditGuard.ts 与迁移 00025）
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CreditLog } from '@/types/types';
+import { insufficientCreditsMessage, openCreditsDialog } from '@/lib/creditGuard';
+import { toast } from 'sonner';
 
 export interface CreditsState {
   creditsTotal: number;
@@ -15,12 +19,20 @@ export interface CreditsState {
   planName: string;
 }
 
+// ── 模块级余额缓存：供 creditGuard 零网络请求前置校验使用 ────────────────────
+let _latestCreditsLeft: number | null = null;
+/** 读取最近一次已知的积分余额；尚未获取过时返回 null（调用方自行回源） */
+export function peekCreditsLeft(): number | null {
+  return _latestCreditsLeft;
+}
+
 export function useCredits() {
   const { user } = useAuth();
   const [state, setState] = useState<CreditsState>({
-    creditsTotal: 50, creditsUsed: 0, creditsLeft: 50,
+    creditsTotal: 20, creditsUsed: 0, creditsLeft: 20,
     usagePercent: 0, loading: true, planName: '免费版',
   });
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const fetch = useCallback(async () => {
     if (!user) { setState(s => ({ ...s, loading: false })); return; }
@@ -32,9 +44,10 @@ export function useCredits() {
         .eq('user_id', user.id)
         .maybeSingle();
       if (data) {
-        const total = data.credits_total ?? 50;
+        const total = data.credits_total ?? 20;
         const used = data.credits_used ?? 0;
         const left = Math.max(0, total - used);
+        _latestCreditsLeft = left;
         setState({
           creditsTotal: total,
           creditsUsed: used,
@@ -44,11 +57,12 @@ export function useCredits() {
           planName: (data.plans as { name?: string } | null)?.name ?? '免费版',
         });
       } else {
-        // 兜底逻辑：无 user_plans 记录时默认给予 50 初始积分
+        // 兜底逻辑：无 user_plans 记录时默认给予 20 初始积分（与注册赠送一致）
+        _latestCreditsLeft = 20;
         setState({
-          creditsTotal: 50,
+          creditsTotal: 20,
           creditsUsed: 0,
-          creditsLeft: 50,
+          creditsLeft: 20,
           usagePercent: 0,
           loading: false,
           planName: '免费版',
@@ -61,7 +75,53 @@ export function useCredits() {
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  // 监听全局积分变动事件
+  // 1. Supabase Realtime 跨端/多标签页实时监听 (user_plans & credit_logs)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    try {
+      const channel = supabase
+        .channel(`user-credits-sync-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_plans',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetch();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'credit_logs',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetch();
+          }
+        )
+        .subscribe();
+
+      channelRef.current = channel;
+    } catch (e) {
+      console.warn('[useCredits] Realtime 订阅初始化跳过:', e);
+    }
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [user?.id, fetch]);
+
+  // 2. 监听本地自定义事件（保留兼容本地迅速响应）
   useEffect(() => {
     const handleChanged = () => { fetch(); };
     window.addEventListener('credits_changed', handleChanged);
@@ -72,107 +132,72 @@ export function useCredits() {
 }
 
 /**
- * deductUserCredits - 扣除用户积分并写入流水明细
+ * deductUserCredits - 扣除用户积分
+ * 唯一原子路径：数据库 SECURITY DEFINER RPC deduct_credits（FOR UPDATE 行锁 + 余额校验 + 流水写入，杜绝并发双扣）
  */
 export async function deductUserCredits(
   userId: string,
   amount: number,
   description: string,
   type: CreditLog['type'] = 'video_generate'
-): Promise<{ success: boolean; creditsLeft: number; message?: string }> {
+): Promise<{ success: boolean; creditsLeft: number; message?: string; insufficientCredits?: boolean }> {
   if (!userId) {
     return { success: false, creditsLeft: 0, message: '请先登录账号' };
   }
 
   try {
-    // 1. 查询当前用户套餐与积分状态
-    const { data: planData } = await supabase
-      .from('user_plans')
-      .select('id, credits_total, credits_used, plan_id')
-      .eq('user_id', userId)
-      .maybeSingle();
+    // 唯一原子路径：执行数据库 RPC deduct_credits（返回 jsonb: { ok, credits_left }）
+    const { data: rpcData, error: rpcError } = await supabase.rpc('deduct_credits', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_action: description || type,
+    });
 
-    let creditsTotal = 50;
-    let creditsUsed = 0;
+    if (rpcError) {
+      console.warn('[useCredits] deduct_credits RPC 失败:', rpcError.message);
+      const isInsufficient = rpcError.message?.includes('积分不足') || rpcError.message?.includes('insufficient');
+      if (isInsufficient) {
+        // 余额不足：标准文案 + 自动弹出积分管理与充值弹窗
+        let left = _latestCreditsLeft ?? 0;
+        if (left <= 0) {
+          const { data: plan } = await supabase
+            .from('user_plans')
+            .select('credits_total, credits_used')
+            .eq('user_id', userId)
+            .maybeSingle();
+          left = Math.max(0, (plan?.credits_total ?? 0) - (plan?.credits_used ?? 0));
+        }
+        toast.error(insufficientCreditsMessage(left, amount), { duration: 6000 });
+        openCreditsDialog();
+        return { success: false, creditsLeft: left, insufficientCredits: true, message: insufficientCreditsMessage(left, amount) };
+      }
+      return {
+        success: false,
+        creditsLeft: 0,
+        message: `扣除积分失败：${rpcError.message || '系统繁忙，请稍后重试'}`,
+      };
+    }
 
-    if (!planData) {
-      // 找不到 user_plans 记录，查免费版 plan_id 并创建
-      const { data: freePlan } = await supabase
-        .from('plans')
-        .select('id')
-        .eq('name', '免费版')
+    // RPC 成功：优先采用 RPC 返回的最新余额（00024+ jsonb 版本）；
+    // 旧版 RPC（00013 void）无返回值时回退为重查一次，保证两种线上版本均正确
+    let left = Number(rpcData?.credits_left);
+    if (!Number.isFinite(left) || rpcData === null) {
+      const { data: latestPlan } = await supabase
+        .from('user_plans')
+        .select('credits_total, credits_used')
+        .eq('user_id', userId)
         .maybeSingle();
-
-      const planId = freePlan?.id || '8165825b-21c8-4fce-8764-2764457bcd52';
-      const now = new Date().toISOString();
-      const nextMonth = new Date();
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-      await supabase.from('user_plans').insert({
-        user_id: userId,
-        plan_id: planId,
-        credits_total: 50,
-        credits_used: 0,
-        cycle_start: now,
-        cycle_end: nextMonth.toISOString(),
-        status: 'active',
-      }).catch(e => console.warn('插入 user_plans 告警:', e));
-    } else {
-      creditsTotal = planData.credits_total ?? 50;
-      creditsUsed = planData.credits_used ?? 0;
+      left = Math.max(0, (latestPlan?.credits_total ?? 0) - (latestPlan?.credits_used ?? amount));
     }
+    left = Math.max(0, left);
+    _latestCreditsLeft = left;
 
-    const currentLeft = Math.max(0, creditsTotal - creditsUsed);
-
-    // 2. 检查积分是否足够
-    if (currentLeft < amount) {
-      return {
-        success: false,
-        creditsLeft: currentLeft,
-        message: `积分余额不足！生成需消耗 ${amount} 积分，当前剩余 ${currentLeft} 积分。`,
-      };
-    }
-
-    const newUsed = creditsUsed + amount;
-    const newLeft = Math.max(0, creditsTotal - newUsed);
-
-    // 3. 更新 user_plans 中的 credits_used
-    const { error: updateErr } = await supabase
-      .from('user_plans')
-      .update({ credits_used: newUsed })
-      .eq('user_id', userId);
-
-    if (updateErr) {
-      console.error('更新 user_plans 积分失败:', updateErr);
-      return {
-        success: false,
-        creditsLeft: currentLeft,
-        message: '扣除积分失败，请稍后重试',
-      };
-    }
-
-    // 4. 写入积分记录明细 (credit_logs)
-    const logData: any = {
-      user_id: userId,
-      type,
-      amount: -Math.abs(amount),
-      credits_after: newLeft,
-      description,
-    };
-
-    const { error: logErr } = await supabase.from('credit_logs').insert(logData);
-    if (logErr) {
-      console.warn('插入 credit_logs 带 credits_after 失败，尝试标准字段:', logErr);
-      delete logData.credits_after;
-      await supabase.from('credit_logs').insert(logData).catch(e => console.error('写入积分流水错误:', e));
-    }
-
-    // 5. 广播全局积分变更事件
-    window.dispatchEvent(new CustomEvent('credits_changed', { detail: { creditsLeft: newLeft } }));
+    // 广播本地事件 & 跨标签页
+    window.dispatchEvent(new CustomEvent('credits_changed', { detail: { creditsLeft: left } }));
 
     return {
       success: true,
-      creditsLeft: newLeft,
+      creditsLeft: left,
     };
   } catch (err: any) {
     console.error('扣除积分过程产生错误:', err);
@@ -181,6 +206,35 @@ export async function deductUserCredits(
       creditsLeft: 0,
       message: '扣除积分过程产生错误',
     };
+  }
+}
+
+/**
+ * refundGenerationCredits - 视频生成失败自动退还积分（失败回滚）
+ * 经 ai-assistant 边缘函数 refund_generation_credits action 执行（refund_credits RPC 仅限 service_role），
+ * 逐笔审计入账，保障「失败不扣费、重试不重复扣费」。
+ */
+export async function refundGenerationCredits(
+  userId: string,
+  amount: number = 10,
+  reason: string = '视频生成失败，自动退还积分'
+): Promise<{ success: boolean; balance: number; message?: string }> {
+  if (!userId) return { success: false, balance: 0, message: '请先登录账号' };
+  try {
+    const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      body: { action: 'refund_generation_credits', amount, reason },
+    });
+    if (error) {
+      console.warn('[useCredits] 退款失败:', error.message);
+      return { success: false, balance: 0, message: error.message };
+    }
+    const balance = Math.max(0, Number(data?.data?.balance ?? data?.balance ?? 0));
+    if (Number.isFinite(balance) && data) _latestCreditsLeft = balance;
+    window.dispatchEvent(new CustomEvent('credits_changed', { detail: { creditsLeft: balance } }));
+    return { success: true, balance };
+  } catch (err: any) {
+    console.error('[useCredits] 退款过程产生错误:', err);
+    return { success: false, balance: 0, message: err?.message || '退款请求失败' };
   }
 }
 

@@ -88,10 +88,12 @@ Deno.serve(async (req) => {
           if (match) snapshots = JSON.parse(match[0]);
         } catch { /* 降级使用模拟数据 */ }
 
+        let isSimulated = false;
         if (!snapshots.length) {
+          isSimulated = true;
           snapshots = [1,2,3].map(i => ({
-            video_id: `vid_${Date.now()}_${i}`,
-            title: `${acct.account_name} 最新爆款视频 ${i}`,
+            video_id: `vid_sim_${Date.now()}_${i}`,
+            title: `${acct.account_name} 演示模拟爆款视频 ${i}`,
             play_count: 50000 + Math.floor(Math.random() * 200000),
             like_count: 2000 + Math.floor(Math.random() * 15000),
             comment_count: 200 + Math.floor(Math.random() * 2000),
@@ -109,7 +111,12 @@ Deno.serve(async (req) => {
         await supabase.from('competitor_snapshots').upsert(rows, { onConflict: 'account_id,video_id' });
         await supabase.from('competitor_accounts').update({ last_crawled_at: new Date().toISOString() }).eq('id', account_db_id);
 
-        return ok({ crawled: snapshots.length, message: `成功抓取 ${snapshots.length} 条视频数据` });
+        return ok({
+          crawled: snapshots.length,
+          message: isSimulated ? `未配置外部爬虫API，生成 ${snapshots.length} 条演示模拟数据` : `成功抓取 ${snapshots.length} 条视频数据`,
+          simulated: isSimulated,
+          degraded_reason: isSimulated ? '未配置外部抓取API，系统返回模拟演示数据' : undefined,
+        });
       }
 
       // ─── P3-M02: 直播高光ASR分析 ──────────────────────────────────────────
@@ -150,8 +157,10 @@ Deno.serve(async (req) => {
           if (match) analysisResult = JSON.parse(match[0]);
         } catch { /* 降级 */ }
 
+        let isLiveSimulated = false;
         // 降级：生成模拟高光数据
         if (!analysisResult.highlights) {
+          isLiveSimulated = true;
           const types = ['product_pitch','demo','promo','qa','reaction','product_pitch','promo'];
           let cursor = 180;
           const highlights = types.slice(0,6).map((type, i) => {
@@ -179,7 +188,13 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
         }).eq('id', taskId);
 
-        return ok({ task_id: taskId, ...analysisResult, message: '直播高光分析完成' });
+        return ok({
+          task_id: taskId,
+          ...analysisResult,
+          message: isLiveSimulated ? '直播高光分析完成（模拟演示数据）' : '直播高光分析完成',
+          simulated: isLiveSimulated,
+          degraded_reason: isLiveSimulated ? '未配置语音ASR识别模型，使用预设高光分段数据' : undefined,
+        });
       }
 
       // ─── P3-M04: 生成API Key ──────────────────────────────────────────────
@@ -375,10 +390,14 @@ Deno.serve(async (req) => {
         await supabase.from('publish_tasks').update({
           status: 'published',
           published_at: new Date().toISOString(),
-          platform_video_id: `platform_${Date.now()}`,
+          platform_video_id: `platform_sim_${Date.now()}`,
           platform_url: `https://www.douyin.com/video/sim_${Date.now()}`,
         }).eq('id', task_id).eq('user_id', userId);
-        return ok({ message: '视频已发布成功（模拟）' });
+        return ok({
+          message: '视频已发布成功（模拟发布演示）',
+          simulated: true,
+          notice: '生产环境发布需经抖音/TikTok官方开放平台企业OAuth2授权并打通发布API',
+        });
       }
 
       // ─── P3-S04: 更新个性化偏好 ───────────────────────────────────────────

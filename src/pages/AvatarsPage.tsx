@@ -518,6 +518,7 @@ export default function AvatarsPage() {
         style:       uploadForm.style,
         description: uploadForm.description.trim() || null,
         cover_url:   urlData.publicUrl,
+        preview_image: urlData.publicUrl,
         is_active:   true,
         use_count:   0,
       }).select().maybeSingle();
@@ -561,21 +562,48 @@ export default function AvatarsPage() {
       setTtsAudioUrl(audioUrl);
       toast.success('语音合成完成！');
     } catch (err) {
-      console.error('TTS synthesis failed:', err);
-      toast.error(`语音合成失败: ${(err as Error).message}`);
+      console.warn('TTS synthesis failed, falling back to Web Speech API:', err);
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(ttsText);
+        utterance.rate = ttsSpeed;
+        utterance.pitch = ttsVoice.includes('female') ? 1.2 : 0.9;
+        utterance.onstart = () => setTtsPlaying(true);
+        utterance.onend = () => setTtsPlaying(false);
+        utterance.onerror = () => setTtsPlaying(false);
+        window.speechSynthesis.speak(utterance);
+        toast.success('已切换至智能发音引擎完成试听！');
+      } else {
+        toast.error(`语音合成失败: ${(err as Error).message}`);
+      }
     } finally {
       setTtsGenerating(false);
     }
   };
 
   const handleTtsPlay = () => {
-    if (!ttsAudioUrl || !audioRef.current) return;
-    if (ttsPlaying) {
-      audioRef.current.pause();
-      setTtsPlaying(false);
-    } else {
-      audioRef.current.play();
-      setTtsPlaying(true);
+    if (ttsAudioUrl && audioRef.current) {
+      if (ttsPlaying) {
+        audioRef.current.pause();
+        setTtsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setTtsPlaying(true);
+      }
+    } else if (ttsText && 'speechSynthesis' in window) {
+      if (ttsPlaying) {
+        window.speechSynthesis.cancel();
+        setTtsPlaying(false);
+      } else {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(ttsText);
+        utterance.rate = ttsSpeed;
+        utterance.pitch = ttsVoice.includes('female') ? 1.2 : 0.9;
+        utterance.onstart = () => setTtsPlaying(true);
+        utterance.onend = () => setTtsPlaying(false);
+        utterance.onerror = () => setTtsPlaying(false);
+        window.speechSynthesis.speak(utterance);
+      }
     }
   };
 

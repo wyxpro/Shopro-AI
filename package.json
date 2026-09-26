@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --config vite.config.dev.ts --host 0.0.0.0",
     "build": "vite build",
-    "lint": "tsgo -p tsconfig.check.json; npx biome lint; .rules/check.sh;npx tailwindcss -i ./src/index.css -o /dev/null 2>&1 | grep -E '^(CssSyntaxError|Error):.*' || true;.rules/testBuild.sh"
+    "lint": "tsgo -p tsconfig.check.json && npx biome lint && .rules/check.sh && npx tailwindcss -i ./src/index.css -o /dev/null 2>&1 && .rules/testBuild.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

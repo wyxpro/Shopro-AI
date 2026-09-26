@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraft } from '@/hooks/useDraft';
@@ -262,6 +262,7 @@ function SceneCard({
 export default function ScriptPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // P1-N05 草稿自动保存
   type ScriptDraft = {
@@ -284,6 +285,27 @@ export default function ScriptPage() {
   const [platform, setPlatform]           = useState(draft.platform || 'douyin');
   const [videoLength, setVideoLength]     = useState(draft.videoLength || 25);
   const [draftRestored, setDraftRestored] = useState(hasDraft);
+
+  // 接收来自外部模块（Prompt知识库 / 风格复刻 / 竞品分析）传递的状态
+  useEffect(() => {
+    const state = location.state as any;
+    if (state?.prompt) {
+      setPromptText(state.prompt);
+      toast.info('已自动载入外部优质 Prompt 模版！');
+    }
+    if (state?.productName) {
+      setProductName(state.productName);
+    }
+    if (state?.category) {
+      setCategory(state.category);
+    }
+    if (state?.styleReport) {
+      toast.success(`已载入爆款风格 DNA: ${state.styleReport.dna_fingerprint}`);
+    }
+    if (state?.competitorScript) {
+      toast.success('已载入竞品爆款对标脚本结构！');
+    }
+  }, [location.state]);
 
   // 生成结果默认展现预置示例
   const [scenes, setScenes]       = useState<ScriptScene[]>([

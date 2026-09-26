@@ -1,12 +1,6 @@
-// 微信支付回调 Webhook
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { Aes } from 'npm:wechatpay-axios-plugin';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, wechatpay-signature, wechatpay-timestamp, wechatpay-nonce, wechatpay-serial',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { handleCorsPreflight, getCorsHeaders } from '../_shared/cors.ts';
 
 async function decryptTradeState(
   MCH_API_V3_KEY: string,
@@ -23,7 +17,34 @@ async function decryptTradeState(
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
+  const corsHeaders = getCorsHeaders(req);
+
+  // 1. 微信支付头部校验与防重放窗口（5分钟）
+  const timestamp = req.headers.get('wechatpay-timestamp') || '';
+  const nonce = req.headers.get('wechatpay-nonce') || '';
+  const signature = req.headers.get('wechatpay-signature') || '';
+  const serial = req.headers.get('wechatpay-serial') || '';
+
+  if (!timestamp || !nonce || !signature) {
+    console.error('[webhook] 缺少微信支付签名头 (timestamp/nonce/signature)');
+    return new Response(JSON.stringify({ code: 'FAIL', message: 'Missing WechatPay security headers' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const reqSec = Number(timestamp);
+  if (Number.isNaN(reqSec) || Math.abs(nowSec - reqSec) > 300) {
+    console.error(`[webhook] 时间戳校验失败防重放拦截: reqTimestamp=${timestamp}, now=${nowSec}`);
+    return new Response(JSON.stringify({ code: 'FAIL', message: 'Timestamp replay attack window expired' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -31,15 +52,35 @@ Deno.serve(async (req) => {
   );
 
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    let body: any;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ code: 'FAIL', message: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { resource } = body as {
       resource: { algorithm: string; associated_data: string; nonce: string; ciphertext: string };
     };
 
+    if (!resource || !resource.ciphertext) {
+      return new Response(JSON.stringify({ code: 'FAIL', message: 'Missing resource ciphertext' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const MCH_API_V3_KEY = Deno.env.get('MCH_API_V3_KEY');
     if (!MCH_API_V3_KEY) {
       console.error('[webhook] MCH_API_V3_KEY 未配置');
-      return new Response('ok', { status: 200 }); // 返回 200 避免微信重试
+      return new Response(JSON.stringify({ code: 'FAIL', message: 'MCH_API_V3_KEY unconfigured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { status, order_no } = await decryptTradeState(
@@ -127,9 +168,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response('ok', { status: 200 });
+    return new Response(JSON.stringify({ code: 'SUCCESS', message: '成功' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (e) {
     console.error('[webhook] error:', e instanceof Error ? e.message : e);
-    return new Response('ok', { status: 200 }); // 始终返回 200 避免重试风暴
+    // 微信支付官方规范：业务内部异常返回 500 以便微信发起重试，避免静默失败
+    return new Response(JSON.stringify({ code: 'FAIL', message: e instanceof Error ? e.message : 'Internal Server Error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

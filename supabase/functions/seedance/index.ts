@@ -1,4 +1,6 @@
-// Seedance Video Generation Edge Function
+// Seedance Video Generation Edge Function (JWT Protected)
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -12,6 +14,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
+  }
+
+  // 1. 统一 JWT 身份校验，杜绝公网裸刷
+  const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Missing Authorization Bearer token' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  const supabaseAuth = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+  );
+  const { data: authData, error: authErr } = await supabaseAuth.auth.getUser(token);
+  if (authErr || !authData?.user) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Invalid or expired credentials' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   let body: any;
@@ -32,19 +56,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  let apiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
-  if (!apiKey) {
-    try {
-      const keyUrl = new URL('./key.txt', import.meta.url);
-      apiKey = (await Deno.readTextFile(keyUrl)).trim();
-    } catch (err) {
-      console.error('Failed to read key.txt:', err);
-    }
-  }
-
+  const apiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: 'Server configuration error: missing VECTRUST_API_KEY' }),
+      JSON.stringify({ error: 'Server configuration error: missing VECTRUST_API_KEY in environment secrets' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

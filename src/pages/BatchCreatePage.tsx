@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { deductUserCredits } from '@/hooks/useCredits';
+import { deductUserCredits, refundGenerationCredits } from '@/hooks/useCredits';
+import { ensureCreditsForGeneration, openCreditsDialog, VIDEO_GENERATE_COST } from '@/lib/creditGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -247,10 +248,16 @@ export default function BatchCreatePage() {
       return;
     }
 
-    const totalCost = selectedProducts.length * 10;
+    const totalCost = selectedProducts.length * VIDEO_GENERATE_COST;
+
+    // 统一积分守卫：余额不足以覆盖整个批次时直接拦截，并自动弹出充值弹窗
+    const guard = await ensureCreditsForGeneration(user.id, totalCost);
+    if (!guard.ok) return;
+
     const deductRes = await deductUserCredits(user.id, totalCost, `批量生成 ${selectedProducts.length} 个商品视频`, 'video_generate');
     if (!deductRes.success) {
-      toast.error(deductRes.message || `积分不足！批量生成 ${selectedProducts.length} 个视频需消耗 ${totalCost} 积分（当前剩余 ${deductRes.creditsLeft} 积分），请充值！`);
+      toast.error(deductRes.message || `积分不足（当前 ${deductRes.creditsLeft}，批量生成需 ${totalCost}），请充值后重试`, { duration: 6000 });
+      if (!deductRes.insufficientCredits) openCreditsDialog();
       return;
     }
 
@@ -288,6 +295,9 @@ export default function BatchCreatePage() {
       loadJobs();
     } catch (err: any) {
       toast.error('创建失败：' + (err.message || '请重试'));
+      // 失败回滚：批量任务创建失败时退还已扣的全部积分
+      const res = await refundGenerationCredits(user.id, totalCost, `批量任务创建失败，退还 ${selectedProducts.length} 个视频积分`);
+      if (res.success) toast.info(`已自动退还 ${totalCost} 积分`);
     } finally {
       setSubmitting(false);
     }

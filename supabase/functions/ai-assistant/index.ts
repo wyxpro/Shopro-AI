@@ -59,7 +59,7 @@ async function checkRateLimitDB(
   }
 }
 
-// ─── P2-N06: LLM 响应缓存（24h TTL）─────────────────────────────────────────
+// ─── P2-N06: LLM 响应缓存（24h TTL + SHA-256 + 命中自增 RPC）────────────────
 async function getCachedResponse(
   supabase: ReturnType<typeof createClient>,
   cacheKey: string,
@@ -72,9 +72,9 @@ async function getCachedResponse(
       .maybeSingle();
     if (!data) return null;
     if (new Date(data.expires_at) < new Date()) return null;
-    // 命中：更新 hit_count（fire-and-forget）
-    supabase.from('llm_cache').update({ hit_count: supabase.rpc('get_hit_count_plus1' as never) })
-      .eq('cache_key', cacheKey).then(() => {/* noop */});
+
+    // 命中：调用原子自增 RPC increment_llm_cache_hit（安全异步累加）
+    supabase.rpc('increment_llm_cache_hit', { p_cache_key: cacheKey }).then(() => {/* noop */});
     return data.response;
   } catch {
     return null;
@@ -100,17 +100,22 @@ async function setCachedResponse(
   } catch { /* 缓存写入失败不影响主流程 */ }
 }
 
-function makeCacheKey(action: string, params: Record<string, unknown>): string {
-  // 简单 hash: action + 关键参数的 JSON
-  const stable = JSON.stringify({ action, ...params }, Object.keys({ action, ...params }).sort());
-  let hash = 0;
-  for (let i = 0; i < stable.length; i++) {
-    hash = ((hash << 5) - hash + stable.charCodeAt(i)) | 0;
+async function makeCacheKey(action: string, params: Record<string, unknown>): Promise<string> {
+  try {
+    // 基于标准 SHA-256 哈希，彻底消除 32 位弱哈希碰撞串用风险
+    const stable = JSON.stringify(params, Object.keys(params).sort());
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${action}:${stable}`);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${action}:${hashHex.slice(0, 32)}`;
+  } catch {
+    return `${action}:${Date.now().toString(36)}`;
   }
-  return `${action}:${Math.abs(hash).toString(36)}`;
 }
 
-// ─── P1-M04: 积分扣费中间件 ──────────────────────────────────────────────────
+// ─── P1-M04: 积分扣费中间件（fail-close 安全审计模型）───────────────────────────
 const CACHEABLE_ACTIONS = new Set([
   'generate_selling_points', 'analyze_style', 'analyze_traffic',
   'generate_ab_variants', 'emotion_analysis', 'extract_url_selling_points'
@@ -120,11 +125,11 @@ async function deductCredits(
   supabase: ReturnType<typeof createClient>,
   userId: string,
   action: string,
-): Promise<{ allowed: boolean; cost: number; remaining: number }> {
-  if (!userId) return { allowed: true, cost: 0, remaining: 0 }; // 匿名用户放行（演示模式）
+): Promise<{ allowed: boolean; cost: number; remaining: number; error?: string }> {
+  if (!userId) return { allowed: false, cost: 0, remaining: 0, error: '缺少认证用户上下文' };
 
   try {
-    // 查询积分成本
+    // 1. 查询该 action 的基准积分成本
     const { data: costRow } = await supabase
       .from('credit_costs')
       .select('cost')
@@ -133,56 +138,51 @@ async function deductCredits(
     const cost = costRow?.cost ?? 0;
     if (cost === 0) return { allowed: true, cost: 0, remaining: 0 };
 
-    // 查询用户余额
-    const { data: plan } = await supabase
+    // 2. 查询用户套餐与积分状态
+    const { data: plan, error: planErr } = await supabase
       .from('user_plans')
       .select('credits_total, credits_used')
       .eq('user_id', userId)
       .maybeSingle();
-    if (!plan) return { allowed: true, cost, remaining: 0 }; // 无套餐：放行（新用户宽容期）
 
-    const remaining = plan.credits_total - plan.credits_used;
-    if (remaining < cost) return { allowed: false, cost, remaining };
+    if (planErr || !plan) {
+      // 商业安全防御：未绑定套餐或查询失败时严格 fail-close
+      return { allowed: false, cost, remaining: 0, error: '用户未激活有效套餐或积分查询受阻' };
+    }
 
-    // 原子扣除
-    const { error } = await supabase.rpc('deduct_credits', {
+    const total = plan.credits_total ?? 0;
+    const used = plan.credits_used ?? 0;
+    const remaining = Math.max(0, total - used);
+
+    if (remaining < cost) {
+      return { allowed: false, cost, remaining, error: `积分余额不足（需消耗 ${cost} 积分，当前剩余 ${remaining} 积分）` };
+    }
+
+    // 3. 执行原子扣减 RPC (00013 / 00022)
+    const { error: rpcErr } = await supabase.rpc('deduct_credits', {
       p_user_id: userId,
       p_amount: cost,
       p_action: action,
     });
-    if (error) return { allowed: true, cost, remaining }; // RPC 失败：放行但记录
+
+    if (rpcErr) {
+      // RPC 报错严格拦截并审计落库，杜绝放行漏洞
+      await logError(supabase, action, `扣费 RPC 失败: ${rpcErr.message}`, userId, { cost, remaining });
+      return { allowed: false, cost, remaining, error: `积分扣除失败: ${rpcErr.message}` };
+    }
+
     return { allowed: true, cost, remaining: remaining - cost };
-  } catch {
-    return { allowed: true, cost: 0, remaining: 0 };
+  } catch (err: any) {
+    await logError(supabase, action, `扣费系统异常: ${err?.message}`, userId);
+    return { allowed: false, cost: 0, remaining: 0, error: '计费服务暂时异常，请稍后重试' };
   }
 }
-// ─── EF-01: 唯一 callLLM（带 systemPrompt + 流式聚合）────────────────────────
+// ─── EF-01: 唯一 callLLM（GLM-5.3-Flash 主通道 + appmiaoda 网关回退，流式聚合）──
 const GATEWAY_URL = 'https://app-bnjgmg2jpu6a-api-zYkZz8qovQ1L-gateway.appmiaoda.com/v2/chat/completions';
 
-async function callLLM(
-  messages: Array<{ role: string; content: string }>,
-  systemPrompt?: string,
-): Promise<string> {
-  const apiKey = Deno.env.get('INTEGRATIONS_API_KEY');
-  if (!apiKey) throw new Error('Missing INTEGRATIONS_API_KEY');
-
-  const fullMessages = systemPrompt
-    ? [{ role: 'system', content: systemPrompt }, ...messages]
-    : messages;
-
-  const response = await fetch(GATEWAY_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Gateway-Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ messages: fullMessages, enable_thinking: false }),
-  });
-
-  if (!response.ok) throw new Error(`LLM API error: ${response.status}`);
-  if (!response.body) throw new Error('No response body');
-
-  const reader = response.body.getReader();
+// OpenAI 兼容 SSE 流式响应聚合（GLM 主通道与网关回退共用）
+async function aggregateSSEContent(response: Response): Promise<string> {
+  const reader = response.body!.getReader();
   const decoder = new TextDecoder('utf8');
   let fullContent = '';
   let buffer = '';
@@ -204,6 +204,56 @@ async function callLLM(
     }
   }
   return fullContent;
+}
+
+async function callLLM(
+  messages: Array<{ role: string; content: string }>,
+  systemPrompt?: string,
+): Promise<string> {
+  const fullMessages = systemPrompt
+    ? [{ role: 'system', content: systemPrompt }, ...messages]
+    : messages;
+
+  // 1. 主通道：Sophnet 平台 GLM-5.3-Flash（OpenAI 兼容接口）；密钥仅从环境变量读取，绝不硬编码
+  const glmApiKey = Deno.env.get('GLM_API_KEY');
+  if (glmApiKey) {
+    const glmBaseUrl = Deno.env.get('GLM_BASE_URL') || 'https://www.sophnet.com/api/open-apis';
+    const glmModel = Deno.env.get('GLM_MODEL') || 'glm-5.3-flash';
+    try {
+      const response = await fetch(`${glmBaseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${glmApiKey}`,
+        },
+        body: JSON.stringify({ model: glmModel, messages: fullMessages, stream: true }),
+      });
+      if (response.ok && response.body) {
+        return await aggregateSSEContent(response);
+      }
+      console.error(`[callLLM] GLM primary failed: ${response.status}, fallback to gateway`);
+    } catch (glmErr) {
+      console.error('[callLLM] GLM primary error, fallback to gateway:', glmErr);
+    }
+  }
+
+  // 2. 回退通道：appmiaoda 网关（DeepSeek）
+  const apiKey = Deno.env.get('INTEGRATIONS_API_KEY');
+  if (!apiKey) throw new Error('Missing INTEGRATIONS_API_KEY');
+
+  const response = await fetch(GATEWAY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Gateway-Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ messages: fullMessages, enable_thinking: false }),
+  });
+
+  if (!response.ok) throw new Error(`LLM API error: ${response.status}`);
+  if (!response.body) throw new Error('No response body');
+
+  return aggregateSSEContent(response);
 }
 
 // ─── AI-02: 平台级系统 Prompt ────────────────────────────────────────────────
@@ -235,6 +285,63 @@ async function logError(
   } catch { /* 日志写入失败不影响主流程 */ }
 }
 
+// ─── Row 10: 模型调用台账 + 日算力预算护栏 ─────────────────────────────────
+async function getActionCost(
+  supabase: ReturnType<typeof createClient>,
+  action: string,
+): Promise<number> {
+  try {
+    const { data } = await supabase.from('credit_costs').select('cost').eq('action', action).maybeSingle();
+    return data?.cost ?? 0;
+  } catch { return 0; }
+}
+
+// 返回 { ok, used, budget }；budget<=0 表示不限额。查询异常时不阻断主链路（真实资金门禁由 deductCredits 兜底）
+async function checkDailyBudget(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  cost: number,
+): Promise<{ ok: boolean; used: number; budget: number }> {
+  if (!userId) return { ok: true, used: 0, budget: 0 };
+  try {
+    const { data: plan } = await supabase
+      .from('user_plans').select('daily_credit_budget').eq('user_id', userId).maybeSingle();
+    const budget = plan?.daily_credit_budget ?? 0;
+    if (!budget || budget <= 0) return { ok: true, used: 0, budget: 0 };
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const { data: rows } = await supabase
+      .from('model_calls').select('credits_cost')
+      .eq('user_id', userId).gte('created_at', startOfDay.toISOString());
+    const used = Array.isArray(rows) ? rows.reduce((s, r) => s + (r.credits_cost || 0), 0) : 0;
+    return { ok: used + cost <= budget, used, budget };
+  } catch {
+    return { ok: true, used: 0, budget: 0 };
+  }
+}
+
+// 写台账（走 SECURITY DEFINER RPC，原子返回当日累计成本）；失败不影响主流程
+async function recordModelCall(
+  supabase: ReturnType<typeof createClient>,
+  params: {
+    userId?: string; action: string; provider?: string; model?: string;
+    status: string; latencyMs: number; creditsCost: number; cacheKey?: string; errorMsg?: string;
+  },
+): Promise<void> {
+  try {
+    await supabase.rpc('record_model_call', {
+      p_user_id: params.userId || null,
+      p_action: params.action,
+      p_provider: params.provider ?? null,
+      p_model: params.model ?? null,
+      p_status: params.status,
+      p_latency_ms: params.latencyMs,
+      p_credits_cost: params.creditsCost,
+      p_cache_key: params.cacheKey ?? null,
+      p_error_msg: params.errorMsg ?? null,
+    });
+  } catch { /* 台账写入失败不影响主流程 */ }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // 单一 Deno.serve 入口
 // ────────────────────────────────────────────────────────────────────────────
@@ -248,40 +355,85 @@ Deno.serve(async (req) => {
 
   let action = '';
   let userId = '';
+  let billedCost = 0;
+  const start = Date.now();
 
   try {
+    // 1. 安全提取与校验 Authorization JWT
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+    let authenticatedUserId: string | null = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      const anonClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      );
+      const { data: authData } = await anonClient.auth.getUser(token);
+      if (authData?.user?.id) {
+        authenticatedUserId = authData.user.id;
+      }
+    }
+
     const body = await req.json();
     action = body.action ?? '';
-    userId = body.user_id ?? '';
-
-    // P2-M06: 持久化限流（降级到内存）
-    const clientId = userId || req.headers.get('x-forwarded-for') || 'anonymous';
-    const allowed = await checkRateLimitDB(supabase, clientId);
-    if (!allowed) return err('请求过于频繁，请稍后再试', 4290, 429);
+    const claimedUserId = body.user_id ?? '';
+    // 防伪造审计：强制以真实认证身份为准，严禁无 JWT 时信任 body 传来的 claimedUserId 操纵他人积分或数据
+    if (authenticatedUserId) {
+      if (claimedUserId && claimedUserId !== authenticatedUserId) {
+        await logError(supabase, action, '越权身份伪造警告: body.user_id 与 JWT 不符', authenticatedUserId, { claimedUserId });
+        return err('身份标识与认证凭证不符，拒绝访问', 4030, 403);
+      }
+      userId = authenticatedUserId;
+    } else {
+      // 未携带有效 JWT 时，不能借由 claimedUserId 冒充他人
+      userId = '';
+    }
 
     if (!action) return err('缺少 action 参数', 1001);
 
-    // P1-M04: 积分前置扣费（不影响非LLM actions）
+    // P1-M04: 计费 action 严格门禁
     const billedActions = new Set([
       'generate_selling_points','optimize_prompt','generate_storyboard',
       'generate_video','analyze_traffic','analyze_style','generate_ab_variants',
       'generate_script_four_layer','extract_highlights','content_moderation',
       'emotion_analysis','translate_script','generate_cover','extract_url_selling_points'
     ]);
-    if (billedActions.has(action) && userId) {
-      const { allowed: creditsOk, cost, remaining } = await deductCredits(supabase, userId, action);
+
+    // 若属于计费 action，强制必须登录授权
+    if (billedActions.has(action)) {
+      if (!userId) {
+        return err('该 AI 能力需要登录授权，请携带有效的 Authorization 令牌', 4010, 401);
+      }
+      // Row 10: 日算力预算护栏（超预算 fail-close 熔断）
+      const estCost = await getActionCost(supabase, action);
+      const budget = await checkDailyBudget(supabase, userId, estCost);
+      if (!budget.ok) {
+        await logError(supabase, action, `日算力预算超限: 已用 ${budget.used}/上限 ${budget.budget}`, userId);
+        await recordModelCall(supabase, { userId, action, status: 'blocked', latencyMs: Date.now() - start, creditsCost: 0 });
+        return err(`今日 AI 算力预算已达上限（${budget.budget} 积分），请明日再试或联系管理员调整额度`, 4002, 429);
+      }
+      const { allowed: creditsOk, cost, remaining, error: creditErr } = await deductCredits(supabase, userId, action);
+      billedCost = cost;
       if (!creditsOk) {
-        return err(`积分不足（需${cost}积分，剩余${remaining}积分），请升级套餐`, 4001, 402);
+        return err(creditErr || `积分不足（需 ${cost} 积分，当前剩余 ${remaining} 积分），请充值套餐`, 4001, 402);
       }
     }
 
-    // P2-N06: 缓存命中检查（仅对可缓存 actions）
+    // P2-M06: 持久化限流（以安全身份为 key，防止伪造）
+    const clientId = userId || req.headers.get('x-forwarded-for') || 'anonymous';
+    const rateOk = await checkRateLimitDB(supabase, clientId);
+    if (!rateOk) return err('请求过于频繁，请稍后再试', 4290, 429);
+
+    // P2-N06: 缓存命中检查（异步高强度 SHA-256）
     let cacheKey = '';
     if (CACHEABLE_ACTIONS.has(action) && userId) {
       const cacheParams = { ...body, user_id: undefined };
-      cacheKey = makeCacheKey(action, cacheParams);
+      cacheKey = await makeCacheKey(action, cacheParams);
       const cached = await getCachedResponse(supabase, cacheKey);
-      if (cached) return ok(cached);
+      if (cached) {
+        await recordModelCall(supabase, { userId, action, status: 'cached', latencyMs: Date.now() - start, creditsCost: 0, cacheKey });
+        return ok(cached);
+      }
     }
 
     let result: unknown;
@@ -294,7 +446,29 @@ Deno.serve(async (req) => {
       case 'generate_storyboard':
         result = await generateStoryboard(body); break;
       case 'generate_video':
-        result = await generateVideo(body, supabase); break;
+        try {
+          result = await generateVideo(body, supabase);
+        } catch (e) {
+          // 失败回滚：标记项目为 failed 并退还前端提交时预扣的 10 积分
+          // （前端同步阶段失败由 VideoCreatePage 自行退款并置触发标记，二者互斥不重复）
+          try {
+            const pid = (body as { project_id?: string })?.project_id;
+            if (pid) {
+              await supabase.from('video_projects').update({ status: 'failed' }).eq('id', pid);
+            }
+            if (userId) {
+              await supabase.rpc('refund_credits', {
+                p_user_id: userId,
+                p_amount: 10,
+                p_reason: '视频生成失败，自动退还积分',
+              });
+            }
+          } catch (rollbackErr) {
+            console.error('[ai-assistant][generate_video] 回滚失败:', rollbackErr);
+          }
+          throw e;
+        }
+        break;
       case 'analyze_traffic':
         result = await analyzeTraffic(body); break;
       case 'analyze_style':
@@ -302,7 +476,7 @@ Deno.serve(async (req) => {
       case 'generate_ab_variants':
         result = await generateABVariants(body); break;
       case 'generate_script_four_layer':
-        result = await generateScriptFourLayer(body, supabase); break;
+        result = await generateScriptFourLayer(body, supabase, userId); break;
       case 'extract_highlights':
         result = await extractHighlights(body, supabase); break;
       case 'knowledge_rag_search':
@@ -313,9 +487,9 @@ Deno.serve(async (req) => {
       case 'extract_url_selling_points':
         result = await extractUrlSellingPoints(body); break;
       case 'content_moderation':
-        result = await contentModeration(body); break;
+        result = await contentModeration(body, supabase, userId); break;
       case 'emotion_analysis':
-        result = await emotionAnalysis(body); break;
+        result = await emotionAnalysis(body, supabase, userId); break;
       case 'translate_script':
         result = await translateScript(body, supabase); break;
       case 'generate_cover':
@@ -324,6 +498,12 @@ Deno.serve(async (req) => {
         result = await queryCoverTask(body, supabase); break;
       case 'retry_video_job':
         result = await retryVideoJob(body, supabase); break;
+      case 'refund_generation_credits':
+        // 视频生成失败退款：仅允许为本账户退款（JWT 强制），非计费 action 不走扣费链
+        if (!userId) {
+          return err('退款操作需要登录授权，请携带有效的 Authorization 令牌', 4010, 401);
+        }
+        result = await refundGenerationCreditsAction(body, userId, supabase); break;
       default:
         return err(`未知操作: ${action}`, 1002);
     }
@@ -333,11 +513,13 @@ Deno.serve(async (req) => {
       await setCachedResponse(supabase, cacheKey, action, result);
     }
 
+    await recordModelCall(supabase, { userId, action, status: 'success', latencyMs: Date.now() - start, creditsCost: billedCost, cacheKey: cacheKey || undefined });
     return ok(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : '服务内部错误';
     console.error(`[ai-assistant][${action}]`, msg);
     await logError(supabase, action, msg, userId || undefined);
+    await recordModelCall(supabase, { userId, action, status: 'error', latencyMs: Date.now() - start, creditsCost: 0, errorMsg: msg });
     return err(msg, 5000, 500);
   }
 });
@@ -426,7 +608,11 @@ async function generateSellingPoints(body: Record<string, string>) {
     '数码电器': [`${product_name}，高性能流畅运行`, '超长续航全天无忧', '智能互联，轻松掌控'],
     '食品饮料': [`${product_name}，天然原料零添加`, '营养丰富，健康美味', '严格品控，安全放心'],
   };
-  return { selling_points: (templates[category] ?? [`${product_name}，品质卓越`, '专为需求设计', '超高性价比']).slice(0, 3) };
+  return { 
+    selling_points: (templates[category] ?? [`${product_name}，品质卓越`, '专为需求设计', '超高性价比']).slice(0, 3),
+    degraded: true,
+    degraded_reason: '演示模式：LLM调用异常，降级为品类预置卖点'
+  };
 }
 
 // ─── Prompt 优化 ─────────────────────────────────────────────────────────────
@@ -456,6 +642,8 @@ async function generateStoryboard(body: Record<string, unknown>) {
   const { product_name, selling_points } = body as Record<string, string | string[]>;
   const pts = Array.isArray(selling_points) ? selling_points : [];
   return {
+    degraded: true,
+    degraded_reason: '演示模式：未配置外部故事板生成模型，返回预设模板分镜',
     shots: [
       { id: crypto.randomUUID(), order: 1, type: '开场钩子', description: `快速展示${product_name}最亮眼特点，立刻抓住眼球`, duration: 3, text_overlay: `${pts[0] ?? '超强性能'} →`, transition: 'zoom' },
       { id: crypto.randomUUID(), order: 2, type: '痛点呈现', description: '展示用户日常使用痛点，引发共鸣', duration: 4, text_overlay: '你是否有这样的烦恼？', transition: 'fade' },
@@ -475,15 +663,8 @@ async function generateVideo(body: Record<string, unknown>, supabase: ReturnType
   };
   if (!project_id) return { success: false, message: '缺少 project_id' };
 
-  let apiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
-  if (!apiKey) {
-    try {
-      const keyUrl = new URL('./key.txt', import.meta.url);
-      apiKey = (await Deno.readTextFile(keyUrl)).trim();
-    } catch (err) {
-      console.error('Failed to read key.txt inside generateVideo:', err);
-    }
-  }
+  // 严格从环境变量读取，已杜绝读取本地 key.txt 隐患
+  const apiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
 
   // Fallback to mock progress generation if no API key is found
   if (!apiKey) {
@@ -503,7 +684,7 @@ async function generateVideo(body: Record<string, unknown>, supabase: ReturnType
         } : {}),
       }).eq('id', project_id);
     }
-    return { success: true, message: '视频生成完成 (Mock)' };
+    return { success: true, message: '视频生成完成 (Mock)', degraded: true, degraded_reason: '演示模式：未配置 VECTRUST_API_KEY，降级为演示模拟视频' };
   }
 
   // We have the api key, let's call Seedance 2.0 Fast via Vectrust
@@ -657,7 +838,13 @@ async function analyzeTraffic(body: Record<string, unknown>) {
   if (pacing !== 'fast') suggestions.push({ type: 'pacing', title: '加快镜头节奏', description: '前5秒<2s/镜头，降低初始跳出率', priority: 'medium' });
   if (bgm_tempo !== 'high') suggestions.push({ type: 'bgm', title: '提升BGM节奏感', description: '高BPM（120+）互动率提升18%', priority: 'medium' });
   suggestions.push({ type: 'cta', title: '优化CTA位置', description: '在60%进度加购买引导，点击率提升2-4%', priority: 'low' });
-  return { completion_rate: cr, click_rate: ctr, suggestions };
+  return { 
+    completion_rate: cr, 
+    click_rate: ctr, 
+    suggestions,
+    degraded: true,
+    degraded_reason: '演示模式：未接入抖音/TikTok开放平台真实播放数据，返回启发式估算'
+  };
 }
 
 // ─── 风格分析 ────────────────────────────────────────────────────────────────
@@ -675,6 +862,8 @@ async function analyzeStyle(body: Record<string, string>) {
 
   const score = 68 + Math.floor(Math.random() * 26);
   return {
+    degraded: true,
+    degraded_reason: '演示模式：视觉大模型分析降级，返回预设爆款风格特征',
     rhythm: '强拍节奏', pacing: '快节奏', transitions: ['急速切换', '闪白转场', 'J切'],
     subtitle_style: '粗体白字+黑描边', bgm_type: '流行电子', bgm_mood: '活力激昂',
     color_tone: '暖橙调', rhythm_score: score, virality_score: Math.min(100, score + 8),
@@ -722,6 +911,8 @@ async function generateABVariants(body: Record<string, unknown>) {
     '开场展示真实用户评价/销量数据，建立信任感，再引入产品介绍',
   ];
   return {
+    degraded: true,
+    degraded_reason: '演示模式：未配置变体微调模型，返回预置营销结构变体',
     variants: Array.from({ length: count }, (_, i) => ({
       id: crypto.randomUUID(), name: names[i], description: descs[i],
       predicted_cr: 55 + Math.floor(Math.random() * 30),
@@ -735,6 +926,7 @@ async function generateABVariants(body: Record<string, unknown>) {
 async function generateScriptFourLayer(
   body: Record<string, unknown>,
   supabase: ReturnType<typeof createClient>,
+  userId: string,
 ) {
   const {
     user_id, product_name, category, price_range,
@@ -745,11 +937,34 @@ async function generateScriptFourLayer(
   const pts = Array.isArray(selling_points) ? selling_points : [String(selling_points)];
   const pains = Array.isArray(pain_points) ? pain_points : [];
 
+  // Row 2: 读取启用版本 Prompt 模板，按 userId 稳定哈希分流做 A/B（无模板则降级内置四层 Prompt）
+  let templateUsed: { id: string; version: number; variant: string } | null = null;
+  let templateExtra = '';
+  try {
+    const { data: tplRows } = await supabase
+      .from('prompt_templates')
+      .select('id, content, version, variant')
+      .eq('action_key', 'generate_script_four_layer')
+      .eq('is_active', true)
+      .order('version', { ascending: false })
+      .order('variant', { ascending: true });
+    if (Array.isArray(tplRows) && tplRows.length > 0) {
+      let chosen = tplRows[0];
+      if (tplRows.length > 1 && userId) {
+        const enc = new TextEncoder().encode(userId);
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', enc));
+        chosen = tplRows[digest[0] % tplRows.length];
+      }
+      templateUsed = { id: chosen.id, version: chosen.version ?? 1, variant: chosen.variant ?? 'A' };
+      templateExtra = `\n【当前生效模板 v${chosen.version ?? 1}-${chosen.variant ?? 'A'}】${chosen.content}`;
+    }
+  } catch { /* 模板读取失败降级为内置四层 Prompt */ }
+
   const systemPrompt = `你是专业的电商带货视频脚本策划师，精通抖音/TikTok短视频「四层结构」创作：
 ①卖点层：深度理解商品核心差异化价值
 ②痛点层：匹配目标用户真实痛点与情感共鸣
 ③钩子层：设计平台专属的开场钩子与悬念结构（前3秒留存）
-④CTA层：构建紧迫感与高转化行动召唤`;
+④CTA层：构建紧迫感与高转化行动召唤${templateExtra}`;
 
   const userPrompt = `请基于「四层Prompt工程」为以下商品生成完整带货视频脚本：
 
@@ -797,10 +1012,11 @@ async function generateScriptFourLayer(
       if (section) promptText = section.replace(/```.*?```/gs, '').trim();
     }
 
-    // 写入 DB
-    if (user_id) {
+    // 写入 DB（以认证身份为准，降级用 body.user_id）
+    const uid = userId || String(user_id || '');
+    if (uid) {
       await supabase.from('scripts').insert({
-        user_id,
+        user_id: uid,
         product_id: product_id || null,
         title: `${product_name} 四层脚本`,
         platform: platform === 'tiktok' ? 'tiktok' : 'douyin',
@@ -815,7 +1031,7 @@ async function generateScriptFourLayer(
       });
     }
 
-    return { scenes, prompt_text: promptText, full_content: content };
+    return { scenes, prompt_text: promptText, full_content: content, prompt_template: templateUsed };
   } catch (e) {
     console.error('generate_script_four_layer failed:', e);
     throw e;
@@ -886,7 +1102,7 @@ async function extractHighlights(
       caption: [`${video_title || '爆款'}来了，冲！`, '真实效果不踩雷', '这个功能绝了！', '限时抢购别错过', '网友反应太真实'][i % 5],
     };
   });
-  return { highlights };
+  return { highlights, degraded: true, degraded_reason: '演示模式：未配置外部视频分析模型，返回预置高光分段' };
 }
 
 // ─── EF-07: 知识库 RAG 全文检索 ──────────────────────────────────────────────
@@ -923,11 +1139,59 @@ async function knowledgeRagSearch(
 
 
 
-// ─── P1-M05: 内容安全审核 ─────────────────────────────────────────────────────
-async function contentModeration(body: Record<string, unknown>) {
-  const { text, image_url } = body as { text?: string; image_url?: string };
-  if (!text && !image_url) return { pass: true, result: 'pass', reason: '无内容' };
+// ─── P1-M05: 内容安全审核（违禁词初筛 + LLM 复核 + fail-close 防御）────────────
+const SENSITIVE_KEYWORDS = [
+  '博彩', '赌博', '兼职刷单', '六合彩', '毒品', '大麻', '枪支', '弹药',
+  '迷药', '催情', '代开发票', '洗钱', '成人色情', '裸聊', '翻墙梯子'
+];
 
+// Row 8: 风控命中事件落库（供后台联动审计），写入失败不影响审核主流程
+async function writeRiskEvent(
+  supabase: ReturnType<typeof createClient>,
+  e: { userId?: string; action: string; decision: string; category?: string | null; matched_kw?: string | null; confidence?: number; snippet?: string; reason?: string },
+): Promise<void> {
+  try {
+    await supabase.from('risk_events').insert({
+      user_id: e.userId || null,
+      source: 'content_moderation',
+      action: e.action,
+      decision: e.decision,
+      category: e.category ?? null,
+      matched_kw: e.matched_kw ?? null,
+      confidence: e.confidence ?? null,
+      snippet: (e.snippet ?? '').slice(0, 200),
+      reason: e.reason ?? '',
+    });
+  } catch { /* 风控落库失败不影响主流程 */ }
+}
+
+async function contentModeration(
+  body: Record<string, unknown>,
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+) {
+  const { text, image_url } = body as { text?: string; image_url?: string };
+  const snippet = (text || image_url || '');
+  if (!text && !image_url) return { pass: true, result: 'pass', reason: '无待审核内容' };
+
+  // 1. 本地违禁词库毫秒级前置初筛
+  if (text) {
+    for (const kw of SENSITIVE_KEYWORDS) {
+      if (text.includes(kw)) {
+        const reason = `内容命中高危违禁关键词「${kw}」`;
+        await writeRiskEvent(supabase, { userId, action: 'content_moderation', decision: 'reject', category: 'forbidden_goods', matched_kw: kw, confidence: 1.0, snippet, reason });
+        return {
+          pass: false,
+          result: 'reject',
+          confidence: 1.0,
+          reason,
+          category: 'forbidden_goods'
+        };
+      }
+    }
+  }
+
+  // 2. LLM 智能风控语义审核
   const moderationPrompt = `你是内容安全审核员。请审核以下内容是否违规。
 违规类型：色情/暴力/赌博/毒品/政治敏感/诈骗/违禁商品/侮辱性言论。
 ${text ? `\n文本内容：${text}` : ''}${image_url ? `\n图片URL：${image_url}（请根据URL路径描述判断）` : ''}
@@ -942,17 +1206,56 @@ ${text ? `\n文本内容：${text}` : ''}${image_url ? `\n图片URL：${image_ur
     const match = content.match(/\{[\s\S]*\}/);
     if (match) {
       const parsed = JSON.parse(match[0]);
-      return { pass: Boolean(parsed.pass), result: parsed.result ?? (parsed.pass ? 'pass' : 'reject'), confidence: parsed.confidence ?? 0.9, reason: parsed.reason ?? '', category: parsed.category ?? null };
+      const pass = Boolean(parsed.pass);
+      const verdict = {
+        pass,
+        result: parsed.result ?? (pass ? 'pass' : 'reject'),
+        confidence: parsed.confidence ?? 0.9,
+        reason: parsed.reason ?? '',
+        category: parsed.category ?? null
+      };
+      if (!pass) {
+        await writeRiskEvent(supabase, { userId, action: 'content_moderation', decision: 'reject', category: verdict.category, confidence: verdict.confidence, snippet, reason: verdict.reason });
+      }
+      return verdict;
     }
-  } catch (e) { console.error('content_moderation failed:', e); }
-  return { pass: true, result: 'pass', confidence: 0.5, reason: '审核服务暂不可用，默认放行' };
+  } catch (e) {
+    console.error('[content_moderation] LLM 审核调用失败:', e);
+  }
+
+  // 3. 商业级 fail-close：审核服务异常绝不放行违禁内容
+  const reviewReason = '安全审核服务暂时超时或响应异常，为保障平台合规安全，内容已自动拦截并转入人工复核队列';
+  await writeRiskEvent(supabase, { userId, action: 'content_moderation', decision: 'review_pending', category: 'system_error', confidence: 0, snippet, reason: reviewReason });
+  return {
+    pass: false,
+    result: 'review_pending',
+    confidence: 0.0,
+    reason: reviewReason,
+    category: 'system_error'
+  };
 }
 
 // ─── P2-N02: 情绪 NLP 分析 ────────────────────────────────────────────────────
-async function emotionAnalysis(body: Record<string, unknown>) {
-  const { text, sentences } = body as { text?: string; sentences?: string[] };
+async function emotionAnalysis(
+  body: Record<string, unknown>,
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+) {
+  const { text, sentences, project_id } = body as { text?: string; sentences?: string[]; project_id?: string };
   const inputSentences: string[] = sentences ?? (text ? text.split(/[。！？.!?]/).filter(Boolean) : []);
   if (inputSentences.length === 0) return { segments: [] };
+
+  // Row 4: 结果落库供后续复用（按输入指纹缓存），失败不影响返回
+  const persist = async (segments: unknown) => {
+    try {
+      const enc = new TextEncoder().encode(inputSentences.join('|'));
+      const hashHex = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', enc))).map(b => b.toString(16).padStart(2, '0')).join('');
+      await supabase.from('emotion_analyses').insert({
+        user_id: userId || null, project_id: project_id ?? null,
+        source_hash: hashHex.slice(0, 64), segments,
+      });
+    } catch { /* 落库失败不影响返回 */ }
+  };
 
   const emotionPrompt = `你是专业情绪分析师，专注电商带货视频脚本情绪识别。
 分析以下台词句子的情绪类型和强度：
@@ -966,7 +1269,11 @@ ${inputSentences.map((s, i) => `${i + 1}. ${s}`).join('\n')}
   try {
     const content = await callLLM([{ role: 'user', content: emotionPrompt }], PLATFORM_SYSTEM_PROMPT);
     const match = content.match(/\[[\s\S]*\]/);
-    if (match) return { segments: JSON.parse(match[0]) };
+    if (match) {
+      const segments = JSON.parse(match[0]);
+      await persist(segments);
+      return { segments };
+    }
   } catch (e) { console.error('emotion_analysis failed:', e); }
 
   const RULES = [
@@ -977,12 +1284,12 @@ ${inputSentences.map((s, i) => `${i + 1}. ${s}`).join('\n')}
     { kw: ['功能','效果','成分','材质'], emotion: 'product_intro', color: '#3b82f6', intensity: 70 },
     { kw: ['想知道','秘密','告诉你','绝了'], emotion: 'hook', color: '#f59e0b', intensity: 85 },
   ];
-  return {
-    segments: inputSentences.map((s, i) => {
-      const matched = RULES.find(r => r.kw.some(k => s.includes(k)));
-      return { index: i, text: s, emotion: matched?.emotion ?? 'neutral', intensity: matched?.intensity ?? 50, color: matched?.color ?? '#94a3b8', suggestion: '' };
-    }),
-  };
+  const segments = inputSentences.map((s, i) => {
+    const matched = RULES.find(r => r.kw.some(k => s.includes(k)));
+    return { index: i, text: s, emotion: matched?.emotion ?? 'neutral', intensity: matched?.intensity ?? 50, color: matched?.color ?? '#94a3b8', suggestion: '' };
+  });
+  await persist(segments);
+  return { segments, degraded: true, degraded_reason: '演示模式：LLM情感分析失败，降级为规则关键词匹配' };
 }
 
 // ─── P2-N04: 多语言脚本翻译 ───────────────────────────────────────────────────
@@ -1011,13 +1318,7 @@ async function generateCover(body: Record<string, unknown>, supabase: ReturnType
     ? `E-commerce product thumbnail for TikTok, ${product_name || ''}, vibrant colors, bold text overlay, 9:16 vertical, high contrast, eye-catching, professional photography`
     : `电商带货视频封面，产品：${product_name || ''}，风格：${style || '活力高饱和'}，竖版9:16，高对比度，专业摄影，产品主体突出`);
 
-  let seedanceApiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
-  if (!seedanceApiKey) {
-    try {
-      const keyUrl = new URL('./key.txt', import.meta.url);
-      seedanceApiKey = (await Deno.readTextFile(keyUrl)).trim();
-    } catch { /* noop */ }
-  }
+  const seedanceApiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
 
   // If Seedance API Key is available, use Seedance to generate a highly dynamic video cover and extract its thumbnail!
   if (seedanceApiKey) {
@@ -1093,13 +1394,7 @@ async function queryCoverTask(body: Record<string, unknown>, supabase: ReturnTyp
 
   if (task_id.startsWith('seedance_')) {
     const rawTaskId = task_id.replace('seedance_', '');
-    let seedanceApiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
-    if (!seedanceApiKey) {
-      try {
-        const keyUrl = new URL('./key.txt', import.meta.url);
-        seedanceApiKey = (await Deno.readTextFile(keyUrl)).trim();
-      } catch { /* noop */ }
-    }
+    const seedanceApiKey = Deno.env.get('VECTRUST_API_KEY') || Deno.env.get('SEEDANCE_API_KEY');
     if (!seedanceApiKey) throw new Error('Missing VECTRUST_API_KEY for querying cover task');
 
     const queryRes = await fetch(`https://draw.openai-next.com/v1/tasks/${rawTaskId}`, {
@@ -1156,6 +1451,35 @@ async function queryCoverTask(body: Record<string, unknown>, supabase: ReturnTyp
 }
 
 // ─── P1-N06: 视频任务重试 ─────────────────────────────────────────────────────
+/**
+ * refund_generation_credits - 视频生成失败退款（失败回滚）
+ * 前端失败观测点（轮询 FAILED/超时、创建任务异常）经此退还预扣积分；
+ * JWT 强制校验 + 仅限本账户 + 金额上限 100，refund_credits RPC 以 service_role 原子执行并写入正向流水。
+ */
+async function refundGenerationCreditsAction(
+  body: Record<string, unknown>,
+  userId: string,
+  supabase: ReturnType<typeof createClient>
+) {
+  const amount = Math.floor(Number(body.amount ?? 10));
+  const reason = typeof body.reason === 'string' && body.reason.trim()
+    ? body.reason.trim().slice(0, 200)
+    : '视频生成失败，自动退还积分';
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 100) {
+    throw new Error('退款金额非法（应为 1-100 积分）');
+  }
+  const { data, error } = await supabase.rpc('refund_credits', {
+    p_user_id: userId,
+    p_amount: amount,
+    p_reason: reason,
+  });
+  if (error) throw new Error(`退款失败: ${error.message}`);
+  if (!data || (data as { ok?: boolean }).ok === false) {
+    throw new Error((data as { error?: string })?.error || '退款失败');
+  }
+  return { refunded: amount, balance: Number((data as { balance?: number })?.balance ?? 0) };
+}
+
 async function retryVideoJob(body: Record<string, unknown>, supabase: ReturnType<typeof createClient>) {
   const { job_id, project_id } = body as Record<string, string>;
   if (!job_id && !project_id) throw new Error('缺少 job_id 或 project_id');

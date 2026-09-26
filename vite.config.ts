@@ -54,6 +54,33 @@ export default defineConfig({
           });
         },
       },
+      '/glm-api': {
+        target: 'https://www.sophnet.com',
+        changeOrigin: true,
+        // GLM-5.3-Flash (Sophnet) 真实路径前缀为 /api/open-apis：
+        // /glm-api/v1/chat/completions → https://www.sophnet.com/api/open-apis/v1/chat/completions
+        // 若仅剔除前缀会被 nginx 拒绝（405 Not Allowed）导致前端 GLM 直连降级通道全部失效
+        rewrite: (path) => path.replace(/^\/glm-api/, '/api/open-apis'),
+        secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin');
+            proxyReq.removeHeader('referer');
+          });
+        },
+      },
+      '/tokendance-api': {
+        target: 'https://tokendance.space',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/tokendance-api/, ''),
+        secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin');
+            proxyReq.removeHeader('referer');
+          });
+        },
+      },
     },
   },
 });

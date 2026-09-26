@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/db/supabase';
+import { OPEN_CREDITS_DIALOG_EVENT, REGISTER_BONUS_CREDITS } from '@/lib/creditGuard';
 
 // ── FE-UX 主题持久化 hook ─────────────────────────────────────────────────
 export type ThemeType = 'light' | 'dark';
@@ -483,7 +484,7 @@ function CreditsDetailModal({ open, onOpenChange }: { open: boolean; onOpenChang
     { id: 'l-1', type: 'recharge', desc: '充值爆款进阶套餐', amount: '+550', date: '2026-08-20 10:30', status: '完成' },
     { id: 'l-2', type: 'consume', desc: 'AI 视频生成任务', amount: '-10', date: '2026-08-20 09:15', status: '支出' },
     { id: 'l-3', type: 'consume', desc: 'AI 视频生成任务', amount: '-10', date: '2026-08-19 16:40', status: '支出' },
-    { id: 'l-4', type: 'reward', desc: '新用户注册赠送包', amount: '+50', date: '2026-08-18 14:20', status: '赠送' },
+    { id: 'l-4', type: 'reward', desc: '新用户注册赠送', amount: '+20', date: '2026-08-18 14:20', status: '赠送' },
   ];
 
   const [payDialogOpen, setPayDialogOpen] = useState(false);
@@ -519,7 +520,7 @@ function CreditsDetailModal({ open, onOpenChange }: { open: boolean; onOpenChang
                   积分管理与充值
                   <Badge variant="outline" className="border-pink-500/40 text-pink-400 text-[10px] font-normal">10积分 = 1元</Badge>
                 </DialogTitle>
-                <p className="text-xs text-zinc-400 mt-0.5">注册新用户免费赠送 50 积分，生成视频消耗 10 积分/次</p>
+                <p className="text-xs text-zinc-400 mt-0.5">注册新用户免费赠送 {REGISTER_BONUS_CREDITS} 积分，生成视频消耗 10 积分/次（10积分 = 1元）</p>
               </div>
             </div>
           </div>
@@ -535,7 +536,7 @@ function CreditsDetailModal({ open, onOpenChange }: { open: boolean; onOpenChang
             </div>
             <div className="text-right">
               <span className="text-[11px] text-zinc-400 block">注册赠送积分</span>
-              <span className="text-xs text-emerald-400 font-medium">已自动到账 (+50)</span>
+              <span className="text-xs text-emerald-400 font-medium">已自动到账 (+{REGISTER_BONUS_CREDITS})</span>
             </div>
           </div>
 
@@ -730,6 +731,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     root.classList.remove('theme-ecommerce');
     root.classList.add('dark');
     localStorage.setItem('theme', 'dark');
+  }, []);
+
+  // 积分不足守卫：任何生成入口余额不足时经全局事件自动弹出「积分管理与充值」弹窗（默认充值 Tab）
+  useEffect(() => {
+    const openCredits = () => setCreditsModalOpen(true);
+    window.addEventListener(OPEN_CREDITS_DIALOG_EVENT, openCredits);
+    return () => window.removeEventListener(OPEN_CREDITS_DIALOG_EVENT, openCredits);
   }, []);
 
   return (

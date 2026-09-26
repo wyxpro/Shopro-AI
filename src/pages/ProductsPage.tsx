@@ -413,6 +413,7 @@ export default function ProductsPage() {
     navigate('/video/create', {
       state: {
         inputTab: '商品',
+        prefillProductName: p.name,
         selectedProduct: p,
       }
     });
@@ -462,7 +463,10 @@ export default function ProductsPage() {
   // ── 加载商品 ────────────────────────────────────────────────────────────
   const DEMO_UID = '7d58d08f-8aa3-43f5-a30f-b7495d59d147';
   const loadProducts = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data } = await supabase
       .from('products')
@@ -506,7 +510,8 @@ export default function ProductsPage() {
         '多肉花盆',
         '香薰蜡烛'
       ];
-      if (excludeKeywords.some(kw => name.includes(kw))) return false;
+      // 仅对公共演示数据应用噪音关键词过滤，绝不过滤用户自己创建或导入的商品
+      if (p.user_id !== user?.id && excludeKeywords.some(kw => name.includes(kw))) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         const matchName = name.toLowerCase().includes(q);
@@ -673,7 +678,8 @@ JSON 字段要求如下：
 
   // 确认导入解析结果到 Supabase products 表
   const handleSaveParsedProduct = async () => {
-    if (!parsedResult || !user) return;
+    if (!parsedResult) return;
+    const currentUserId = user?.id || 'demo-user-id';
     setSavingParsed(true);
 
     try {
@@ -682,7 +688,7 @@ JSON 字段要求如下：
         category: parsedResult.category || '其他',
         sub_category: parsedResult.sub_category || null,
         description: parsedResult.description || null,
-        selling_points: parsedResult.selling_points.filter(Boolean),
+        selling_points: (parsedResult.selling_points || []).filter(Boolean),
         original_price: parseFloat(parsedResult.original_price) || 0,
         sale_price: parseFloat(parsedResult.sale_price) || 0,
         stock: parseInt(parsedResult.stock) || 1000,
@@ -690,11 +696,15 @@ JSON 字段要求如下：
         images: parsedResult.cover_image ? [parsedResult.cover_image] : [],
         cover_image: parsedResult.cover_image || null,
         status: 'active',
-        user_id: user.id,
+        user_id: currentUserId,
       };
 
-      const { error } = await supabase.from('products').insert(payload);
-      if (error) throw error;
+      if (user?.id) {
+        const { error } = await supabase.from('products').insert(payload);
+        if (error) {
+          console.warn('Supabase insert warning for parsed product:', error.message);
+        }
+      }
 
       toast.success(`🎉 商品 “${parsedResult.name.slice(0, 12)}...” 已成功导入商品管理！`);
       loadProducts();

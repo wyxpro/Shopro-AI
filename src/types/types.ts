@@ -151,6 +151,8 @@ export interface VideoProject {
   video_url: string | null;
   thumbnail_url: string | null;
   resolution: string;
+  // 目标分发平台（跨平台导出/分析用）
+  target_platform?: string | null;
   progress: number;
   error_message: string | null;
   // 流量分析

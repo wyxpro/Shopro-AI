@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/db/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -142,6 +143,7 @@ const DEFAULT_PROMPTS: PromptCardItem[] = [
 
 export default function KnowledgePage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [prompts, setPrompts] = useState<PromptCardItem[]>(DEFAULT_PROMPTS);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -569,6 +571,35 @@ export default function KnowledgePage() {
                   ))}
                 </div>
                 <span>已被复用 {activePrompt.usage_count} 次</span>
+              </div>
+
+              {/* 快捷创作联动按钮 */}
+              <div className="pt-3 border-t border-border/60 flex items-center justify-end gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1.5 border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                  onClick={() => {
+                    setDetailModalOpen(false);
+                    navigate('/script', { state: { prompt: activePrompt.content, category: activePrompt.category } });
+                    toast.success('已将当前 Prompt 带入商品带货脚本创作！');
+                  }}
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  带入带货脚本创作
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 text-white"
+                  onClick={() => {
+                    setDetailModalOpen(false);
+                    navigate('/video/create', { state: { prompt: activePrompt.content } });
+                    toast.success('已将当前 Prompt 带入 AI 视频工作台！');
+                  }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  带入工作台生成视频
+                </Button>
               </div>
             </div>
           )}

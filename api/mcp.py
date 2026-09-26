@@ -14,8 +14,8 @@ for path in [parent_dir, mcp_dir]:
 # Import local MCP server script
 import mcp_shopro_server
 
-# Disable DNS Rebinding Protection for public Vercel production deployment
-mcp_shopro_server.mcp.settings.transport_security.enable_dns_rebinding_protection = False
+# Enable DNS Rebinding Protection for production safety (R4)
+mcp_shopro_server.mcp.settings.transport_security.enable_dns_rebinding_protection = True
 
 # Expose Starlette app & session manager
 mcp_app = mcp_shopro_server.mcp.streamable_http_app()
@@ -102,6 +102,29 @@ async def app(scope, receive, send):
                 "body": body,
             })
             return
+
+        # 校验调用方鉴权令牌 (R4)
+        mcp_key = os.getenv("MCP_API_KEY") or os.getenv("MCP_AUTH_TOKEN")
+        if mcp_key:
+            auth_token = ""
+            for k, v in scope.get("headers", []):
+                if k.lower() == b"authorization":
+                    auth_token = v.decode("utf-8", errors="ignore").replace("Bearer ", "").strip()
+                elif k.lower() == b"x-mcp-key":
+                    auth_token = v.decode("utf-8", errors="ignore").strip()
+
+            if auth_token != mcp_key:
+                err_body = b'{"error":"unauthorized","message":"Missing or invalid MCP authorization token"}'
+                await send({
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [
+                        [b"content-type", b"application/json"],
+                        [b"content-length", str(len(err_body)).encode("utf-8")],
+                    ],
+                })
+                await send({"type": "http.response.body", "body": err_body})
+                return
 
     # Auto-initialize StreamableHTTP session manager task group per-request within current event loop
     try:

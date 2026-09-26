@@ -3,9 +3,17 @@
  * Captures first frame (t=0.1s) from video URL using HTML5 Canvas
  */
 export async function extractVideoFirstFrame(videoUrl: string): Promise<string> {
+  const meta = await extractVideoMeta(videoUrl);
+  return meta ? meta.frame : '';
+}
+
+/**
+ * 提取视频首帧与真实分辨率元数据（用于素材列表封面/分辨率精准对齐）
+ */
+export async function extractVideoMeta(videoUrl: string): Promise<{ frame: string; width: number; height: number } | null> {
   return new Promise((resolve) => {
     if (!videoUrl) {
-      resolve('');
+      resolve(null);
       return;
     }
 
@@ -17,7 +25,7 @@ export async function extractVideoFirstFrame(videoUrl: string): Promise<string> 
 
     const timer = setTimeout(() => {
       video.remove();
-      resolve('');
+      resolve(null);
     }, 3500);
 
     video.onloadeddata = () => {
@@ -34,21 +42,22 @@ export async function extractVideoFirstFrame(videoUrl: string): Promise<string> 
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const meta = { frame: dataUrl, width: video.videoWidth || canvas.width, height: video.videoHeight || canvas.height };
           video.remove();
-          resolve(dataUrl);
+          resolve(meta);
           return;
         }
       } catch (err) {
         console.warn('Canvas first frame extraction failed:', err);
       }
       video.remove();
-      resolve('');
+      resolve(null);
     };
 
     video.onerror = () => {
       clearTimeout(timer);
       video.remove();
-      resolve('');
+      resolve(null);
     };
 
     video.src = videoUrl;
@@ -69,21 +78,20 @@ export const VIDEO_COVER_MAP: Record<string, string> = {
 };
 
 export async function getVideoCoverImage(videoUrl: string, avatarImage?: string, firstFrame?: string): Promise<string> {
-  // 1. 优先使用用户在工作台上传的首帧图片或选定的数字人真实头像图片
-  if (firstFrame && firstFrame.startsWith('data:image')) return firstFrame;
-  if (avatarImage && avatarImage.startsWith('/person/')) return avatarImage;
-
-  // 2. 视频与本地真实首帧封面映射校验
-  if (videoUrl && VIDEO_COVER_MAP[videoUrl]) {
-    return VIDEO_COVER_MAP[videoUrl];
-  }
-
-  // 3. 尝试 Canvas 动态提取首帧
+  // 1. 首选：直接从成片 Canvas 抽取真实第一帧（保证封面就是视频本身画面）
   const extracted = await extractVideoFirstFrame(videoUrl);
   if (extracted && extracted.startsWith('data:image')) {
     return extracted;
   }
 
-  // 4. 高清电商图兜底，确保永远是合法 image 绝非 .mp4 视频文件
+  // 2. 用户在工作台上传的首帧图：它本身就是成片的起始画面，等价于真实首帧
+  if (firstFrame && firstFrame.startsWith('data:image')) return firstFrame;
+
+  // 3. 本地演示视频与真实首帧画面的映射兼容（Canvas 因浏览器安全策略提取失败时的等效画面）
+  if (videoUrl && VIDEO_COVER_MAP[videoUrl]) {
+    return VIDEO_COVER_MAP[videoUrl];
+  }
+
+  // 4. 数字人头像兜底（头像即视频主体形象），并确保永远是合法 image 绝非 .mp4 视频文件
   return avatarImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80';
 }

@@ -1,12 +1,21 @@
+import { handleCorsPreflight, getCorsHeaders } from '../_shared/cors.ts';
+import { authenticateRequest } from '../_shared/auth.ts';
+import { forbiddenResponse, errorResponse, jsonResponse } from '../_shared/errors.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
+  const corsHeaders = getCorsHeaders(req);
+
+  // 安全网关校验：仅允许 service_role 凭证调用或显式开启 ENABLE_SETUP_DEMO=true 开关
+  const auth = await authenticateRequest(req);
+  const enableDemo = Deno.env.get('ENABLE_SETUP_DEMO') === 'true';
+
+  if (!auth.isServiceRole && !enableDemo) {
+    return forbiddenResponse('拒绝访问：setup-demo 端点仅限 service_role 内部凭据调用或显式开启 ENABLE_SETUP_DEMO', req);
+  }
 
   try {
     const supabase = createClient(

@@ -27,6 +27,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 使用 Web Crypto API 生成密码学安全、无混淆字符的邀请码
+  const generateSecureInviteCode = (): string => {
+    try {
+      const array = new Uint8Array(8);
+      window.crypto.getRandomValues(array);
+      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+      let code = '';
+      for (let i = 0; i < array.length; i++) {
+        code += chars[array[i] % chars.length];
+      }
+      return code;
+    } catch {
+      return Math.random().toString(36).substring(2, 10).toUpperCase();
+    }
+  };
+
   const fetchProfile = async (userId: string) => {
     // 先尝试获取
     const { data } = await supabase
@@ -36,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
     if (data) {
       if (!data.invite_code) {
-        const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const code = generateSecureInviteCode();
         const { data: updatedData, error: updateErr } = await supabase
           .from('profiles')
           .update({ invite_code: code })
@@ -56,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const user = userData?.user;
     if (!user) return;
     const username = user.email ? user.email.split('@')[0] : 'user';
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const code = generateSecureInviteCode();
     const { error: insertErr } = await supabase.from('profiles').insert({
       id: userId,
       email: user.email,
@@ -97,9 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = async () => {
+  const signOut = async (scope: 'local' | 'global' = 'local') => {
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope });
     } catch (e) {
       console.warn('Supabase auth.signOut error, clearing client state anyway:', e);
     } finally {

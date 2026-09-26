@@ -904,25 +904,48 @@ $$;
 -- Name: deduct_credits("uuid", integer, "text"); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION "public"."deduct_credits"("p_user_id" "uuid", "p_amount" integer, "p_action" "text") RETURNS "void"
+CREATE FUNCTION "public"."deduct_credits"("p_user_id" "uuid", "p_amount" integer, "p_action" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
+DECLARE
+  v_total   int;
+  v_used    int;
+  v_left    int;
 BEGIN
+  -- 严格防止横向越权：如果客户端携带 JWT 登录态，必须等于自己的 UID
+  IF auth.uid() IS NOT NULL AND auth.uid() != p_user_id THEN
+    RAISE EXCEPTION '权限拒绝：禁止从其他用户的账户扣除积分';
+  END IF;
+
+  -- 锁定行并检查可用余额（悲观锁防并发双扣）
+  SELECT credits_total, credits_used INTO v_total, v_used
+  FROM public.user_plans
+  WHERE user_id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '未找到用户套餐计划';
+  END IF;
+
+  v_left := v_total - v_used;
+  IF v_left < p_amount THEN
+    RAISE EXCEPTION '积分不足：当前剩余 % 积分，本次需要 % 积分', v_left, p_amount;
+  END IF;
+
   UPDATE public.user_plans
   SET credits_used = credits_used + p_amount,
       updated_at   = now()
-  WHERE user_id = p_user_id
-    AND (credits_total - credits_used) >= p_amount;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION '积分不足';
-  END IF;
-
-  INSERT INTO public.credit_logs (user_id, action, amount, balance_after)
-  SELECT p_user_id, p_action, -p_amount,
-         (credits_total - credits_used)
-  FROM public.user_plans
   WHERE user_id = p_user_id;
+
+  INSERT INTO public.credit_logs (
+    user_id, amount, type, action, description, credits_after, balance_after
+  )
+  VALUES (
+    p_user_id, -p_amount, 'deduct', p_action, p_action,
+    v_left - p_amount, v_left - p_amount
+  );
+
+  RETURN jsonb_build_object('ok', true, 'credits_left', v_left - p_amount);
 END;
 $$;
 
@@ -965,18 +988,25 @@ BEGIN
     RAISE NOTICE 'profiles insert error: %', SQLERRM;
   END;
 
-  -- 绑定免费套餐
+  -- 绑定免费套餐并赠送 20 积分（新用户默认额度，与迁移 00025 口径一致）
   BEGIN
     SELECT id INTO v_free_plan_id FROM public.plans WHERE name = '免费版' LIMIT 1;
-    IF v_free_plan_id IS NOT NULL THEN
-      INSERT INTO public.user_plans (user_id, plan_id, credits_total, credits_used)
-      VALUES (NEW.id, v_free_plan_id, 100, 0);
+    INSERT INTO public.user_plans (user_id, plan_id, credits_total, credits_used)
+    VALUES (NEW.id, v_free_plan_id, 20, 0)
+    ON CONFLICT (user_id) DO NOTHING;
+
+    -- 首条入账流水：注册赠送 +20（仅在本次确有插入时写入，幂等）
+    IF FOUND THEN
+      INSERT INTO public.credit_logs (
+        user_id, amount, type, action, description, credits_after, balance_after
+      )
+      VALUES (
+        NEW.id, 20, 'bonus', 'register_gift',
+        '注册赠送 +20 积分', 20, 20
+      );
     END IF;
-  EXCEPTION WHEN unique_violation THEN
-    -- 已存在，无需处理
-    NULL;
-  WHEN OTHERS THEN
-    RAISE NOTICE 'user_plans insert error: %', SQLERRM;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'user_plans init error: %', SQLERRM;
   END;
 
   RETURN NEW;
@@ -3259,6 +3289,8 @@ CREATE TABLE "public"."credit_logs" (
     "user_id" "uuid" NOT NULL,
     "amount" integer NOT NULL,
     "type" "text" NOT NULL,
+    "action" "text",
+    "balance_after" integer,
     "description" "text" NOT NULL,
     "credits_after" integer DEFAULT 0 NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,

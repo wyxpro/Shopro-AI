@@ -9,9 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Eye, EyeOff, Video, Sparkles, TrendingUp, Zap,
-  Mail, Lock, User, ArrowLeft, CheckCircle2, KeyRound, Phone, Loader2,
+  Mail, Lock, ArrowLeft, CheckCircle2, KeyRound, Phone, Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { REGISTER_BONUS_CREDITS } from '@/lib/creditGuard';
 
 // 三种模式：login / register / forgot / phone
 type Mode = 'login' | 'register' | 'forgot' | 'phone';
@@ -97,12 +98,14 @@ function PhoneSmsPanel() {
 
               const { data: freePlan } = await supabase.from('plans').select('id').eq('name', '免费版').maybeSingle();
               if (freePlan) {
+                // 新用户默认 20 积分（与 handle_new_user 触发器口径一致）；
+                // ignoreDuplicates 保证不覆盖触发器已写入的初始记录
                 await supabase.from('user_plans').upsert({
                   user_id: signUpData.user.id,
                   plan_id: freePlan.id,
-                  credits_total: 50,
+                  credits_total: REGISTER_BONUS_CREDITS,
                   credits_used: 0,
-                }, { onConflict: 'user_id' });
+                }, { onConflict: 'user_id', ignoreDuplicates: true });
               }
             }
 
@@ -356,8 +359,10 @@ export default function LoginPage() {
       if (!form.email.trim()) errs.email = '请输入邮箱地址';
       else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = '邮箱格式不正确';
     } else {
-      if (!form.username.trim()) errs.username = '请输入用户名';
-      else if (!/^[a-zA-Z0-9_]{3,20}$/.test(form.username)) errs.username = '用户名 3-20 位字母/数字/下划线';
+      if (!form.username.trim()) errs.username = '请输入邮箱账号';
+      else if (form.username.includes('@')) {
+        if (!/\S+@\S+\.\S+/.test(form.username.trim())) errs.username = '邮箱格式不正确';
+      } else if (!/^[a-zA-Z0-9_]{3,20}$/.test(form.username)) errs.username = '请输入完整邮箱账号，或 3-20 位字母/数字/下划线（自动补全 @example.com）';
       if (!form.password) errs.password = '请输入密码';
       else if (form.password.length < 6) errs.password = '密码至少 6 位';
       if (mode === 'register') {
@@ -385,7 +390,8 @@ export default function LoginPage() {
         setForgotSent(true);
         toast.success('重置链接已发送，请检查您的邮箱');
       } else {
-        const email = `${form.username}@example.com`;
+        // 兼容历史口径：填写完整邮箱直接作为账号；仅填用户名则自动补 @example.com（存量账号可正常登录）
+        const email = form.username.includes('@') ? form.username.trim() : `${form.username}@example.com`;
         if (mode === 'login') {
           const { error } = await supabase.auth.signInWithPassword({ email, password: form.password });
           if (error) throw error;
@@ -415,12 +421,14 @@ export default function LoginPage() {
 
               const { data: freePlan } = await supabase.from('plans').select('id').eq('name', '免费版').maybeSingle();
               if (freePlan) {
+                // 新用户默认 20 积分（与 handle_new_user 触发器口径一致）；
+                // ignoreDuplicates 保证不覆盖触发器已写入的初始记录
                 await supabase.from('user_plans').upsert({
                   user_id: data.user.id,
                   plan_id: freePlan.id,
-                  credits_total: 50,
+                  credits_total: REGISTER_BONUS_CREDITS,
                   credits_used: 0,
-                }, { onConflict: 'user_id' });
+                }, { onConflict: 'user_id', ignoreDuplicates: true });
               }
             } catch (setupErr) {
               console.error('注册后初始化数据失败:', setupErr);
@@ -433,10 +441,17 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '操作失败';
-      if (msg.includes('Invalid login credentials')) setErrors({ password: '用户名或密码错误' });
-      else if (msg.includes('User already registered')) setErrors({ username: '该用户名已被注册' });
-      else if (msg.includes('Email not confirmed')) setErrors({ password: '账号未验证，请检查邮箱' });
-      else toast.error(msg);
+      if (msg.includes('Invalid login credentials')) {
+        setErrors({ password: '用户名或密码错误' });
+      } else if (msg.includes('User already registered')) {
+        setErrors({ username: '该邮箱账号已注册，请直接登录' });
+      } else if (msg.includes('Email not confirmed')) {
+        setErrors({ password: '账号未验证，请检查邮箱' });
+      } else if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too many requests')) {
+        toast.error('请求过于频繁，为保障账号安全，请稍候 1~2 分钟后再试');
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -526,15 +541,15 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* 登录/注册：用户名 */}
+              {/* 登录/注册：邮箱账号 */}
               {mode !== 'forgot' && (
                 <div className="space-y-1 sm:space-y-1.5">
-                  <Label htmlFor="username" className="text-sm font-semibold text-foreground">用户名</Label>
+                  <Label htmlFor="username" className="text-sm font-semibold text-foreground">邮箱账号</Label>
                   <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/70 pointer-events-none" />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/70 pointer-events-none" />
                     <Input
                       id="username"
-                      placeholder="字母/数字/下划线，3-20位"
+                      placeholder="请输入邮箱账号，如 name@example.com"
                       value={form.username}
                       onChange={e => set('username', e.target.value)}
                       className={cn('pl-10 h-10 sm:h-11 rounded-lg sm:rounded-xl bg-muted/20 border-border/60 focus-visible:ring-primary', errors.username && 'border-destructive focus-visible:ring-destructive')}
@@ -707,7 +722,7 @@ export default function LoginPage() {
                                 await supabase.from('user_plans').upsert({
                                   user_id: signUpData.user.id,
                                   plan_id: freePlan.id,
-                                  credits_total: 50,
+                                  credits_total: 20, // 对齐注册默认口径：新用户赠 20 积分（触发器已写入时此兜底不覆盖为旧值50）
                                   credits_used: 0,
                                 }, { onConflict: 'user_id' });
                               }

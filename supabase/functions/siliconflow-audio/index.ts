@@ -1,4 +1,6 @@
-// SiliconFlow Audio Edge Function (TeleAI/TeleSpeechASR & FunAudioLLM/CosyVoice2-0.5B)
+// SiliconFlow Audio Edge Function (JWT Protected)
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -14,12 +16,36 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
   }
 
+  // 统一 JWT 鉴权
+  const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Missing Authorization header' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  const supabaseAuth = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+  );
+  const { data: authData, error: authErr } = await supabaseAuth.auth.getUser(token);
+  if (authErr || !authData?.user) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized: Invalid or expired token' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   const url = new URL(req.url);
   const action = url.searchParams.get('action') || 'tts'; // 'asr' or 'tts'
 
-  let apiKey = Deno.env.get('SILICONFLOW_API_KEY');
+  const apiKey = Deno.env.get('SILICONFLOW_API_KEY');
   if (!apiKey) {
-    apiKey = 'sk-fvaewxbnaadhaixwxkrprqdasapwbxkvbypruvquadzeaxyn';
+    return new Response(
+      JSON.stringify({ error: 'Server configuration error: missing SILICONFLOW_API_KEY in environment' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   const baseUrl = Deno.env.get('SILICONFLOW_BASE_URL') || 'https://api.siliconflow.cn/v1';

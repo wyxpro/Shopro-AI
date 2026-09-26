@@ -15,7 +15,7 @@ import {
   Clock, CheckCircle2, AlertCircle, FileVideo, BarChart3, RefreshCw,
   Sparkles, ImagePlus, FlipHorizontal, Trophy, TrendingUp,
   Zap, Target, Activity, Scissors, Upload, ImageIcon, Edit2,
-  CheckSquare, Square, Check,
+  CheckSquare, Square, Check, Share2,
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -25,6 +25,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { extractVideoMeta } from '@/lib/videoFrame';
 import type { VideoProject, Material } from '@/types/types';
 import { cn } from '@/lib/utils';
 import CoverCandidates from '@/components/CoverCandidates';
@@ -45,30 +46,16 @@ const STATUS_TABS = [
   { value: 'failed',     label: '失败' },
 ];
 
-// 视频与本地真实首帧封面映射字典 (数据库刷新永远有效)
-const VIDEO_COVER_MAP: Record<string, string> = {
-  '/Video/CreatOK_2.mp4': '/person/girl1.png',
-  '/Video/CreatOK_4.mp4': '/person/boy1.png',
-  '/Video/CreatOK_7.mp4': '/person/girl2.png',
-  '/Video/CreatOK_8.mp4': '/person/boy2.png',
-  '/Video/CreatOK_10.mp4': '/person/girl3.png',
-  '/Video/CreatOK_6.mp4': '/person/boy3.png',
-  '/Video/CreatOK_9.mp4': '/person/girl4.png',
-  '/Video/CreatOK_11.mp4': '/person/girl5.png',
-  '/Video/CreatOK_5.mp4': '/person/girl1.png',
-};
+// 判断封面是否为真实图片（AI 视频首帧截图或用户上传封面），
+// person 占位图与 unsplash 网图占位一律视为无效，由原始视频首帧提取接替
+function isRealThumbnail(thumb: string | null | undefined): thumb is string {
+  if (!thumb) return false;
+  if (thumb.startsWith('data:image')) return true;
+  return thumb.startsWith('http') && !thumb.endsWith('.mp4') && !thumb.includes('unsplash.com') && !thumb.includes('images.unsplash');
+}
 
-function getValidWorkThumbnail(project: VideoProject): string {
-  const thumb = project.thumbnail_url;
-  if (thumb && thumb.startsWith('http') && !thumb.endsWith('.mp4')) return thumb;
-  if (thumb && thumb.startsWith('data:image')) return thumb;
-  if (thumb && thumb.startsWith('/person/')) return thumb;
-
-  if (project.video_url && VIDEO_COVER_MAP[project.video_url]) {
-    return VIDEO_COVER_MAP[project.video_url];
-  }
-
-  return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80';
+function getValidWorkThumbnail(project: VideoProject): string | null {
+  return isRealThumbnail(project.thumbnail_url) ? project.thumbnail_url : null;
 }
 
 // ── 作品卡片 ─────────────────────────────────────────────────────────────
@@ -86,6 +73,7 @@ function WorkCard({
   isSelected?: boolean;
   onToggleSelect?: (id: string) => void;
 }) {
+  const navigate = useNavigate();
   const cfg = STATUS_CONFIG[project.status];
   const StatusIcon = cfg.Icon;
   const date = new Date(project.created_at).toLocaleDateString('zh-CN', {
@@ -202,7 +190,7 @@ function WorkCard({
       >
         {getValidWorkThumbnail(project) ? (
           <img
-            src={getValidWorkThumbnail(project)}
+            src={getValidWorkThumbnail(project) ?? undefined}
             alt={project.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onLoad={(e) => {
@@ -349,60 +337,79 @@ function WorkCard({
         </div>
       </div>
 
-      {/* ── 操作按钮区（3列：剪辑 / 分析 / 下载+删除） ── */}
-      <div className="grid grid-cols-3 border-t border-border/60 mt-3">
+      {/* ── 操作按钮区（4列：剪辑 / 导出 / 分析 / 下载+删除） ── */}
+      <div className="grid grid-cols-4 border-t border-border/60 mt-3 text-xs">
         {/* 导入剪辑 */}
         <button
-          onClick={() => { if (canPlay) window.location.href = `/video/edit?importId=${project.id}`; }}
+          onClick={() => { if (canPlay) navigate(`/video/edit?importId=${project.id}`); }}
           disabled={!canPlay}
           className={cn(
-            'flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors',
+            'flex items-center justify-center gap-1 py-2.5 font-medium transition-colors',
             canPlay
               ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
               : 'text-muted-foreground/30 cursor-not-allowed',
           )}
+          title="在专业编辑器中精修"
         >
           <Scissors className="w-3.5 h-3.5" />剪辑
         </button>
 
+        {/* 跨平台导出 */}
+        <button
+          onClick={() => { if (canPlay) navigate(`/export-formats?projectId=${project.id}`); }}
+          disabled={!canPlay}
+          className={cn(
+            'flex items-center justify-center gap-1 py-2.5 font-medium transition-colors border-l border-border/60',
+            canPlay
+              ? 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              : 'text-muted-foreground/30 cursor-not-allowed',
+          )}
+          title="转码导出多规格格式并一键分发"
+        >
+          <Share2 className="w-3.5 h-3.5" />导出
+        </button>
+
         {/* 分析 */}
         <button
-          onClick={() => onAnalyze(project.id)}
-          className="flex items-center justify-center gap-1.5 py-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors border-l border-border/60"
+          onClick={() => navigate(`/data-feedback?projectId=${project.id}`)}
+          className="flex items-center justify-center gap-1 py-2.5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors border-l border-border/60"
+          title="查看投放转化与ROAS"
         >
           <BarChart3 className="w-3.5 h-3.5" />分析
         </button>
 
-        {/* 下载 + 删除（合并一格，横向排列） */}
+        {/* 下载 + 删除（横向排列） */}
         <div className="flex border-l border-border/60">
           {/* 下载 */}
           {project.status === 'failed' ? (
             <button
               onClick={() => onRetry(project)}
-              className="flex-1 flex items-center justify-center gap-1 py-3 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              className="flex-1 flex items-center justify-center py-2.5 font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              title="重试生成"
             >
-              <RefreshCw className="w-3.5 h-3.5" />重试
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
           ) : canPlay ? (
             <a
-              href={project.video_url || 'https://www.w3schools.com/html/mov_bbb.mp4'}
+              href={project.video_url || '/Video/CreatOK_2.mp4'}
               download
               target="_blank"
               rel="noreferrer"
-              className="flex-1 flex items-center justify-center gap-1 py-3 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="flex-1 flex items-center justify-center py-2.5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="下载视频"
             >
-              <Download className="w-3.5 h-3.5" />下载
+              <Download className="w-3.5 h-3.5" />
             </a>
           ) : (
-            <span className="flex-1 flex items-center justify-center gap-1 py-3 text-xs font-medium text-muted-foreground/30 cursor-not-allowed">
-              <Download className="w-3.5 h-3.5" />下载
+            <span className="flex-1 flex items-center justify-center py-2.5 font-medium text-muted-foreground/30 cursor-not-allowed">
+              <Download className="w-3.5 h-3.5" />
             </span>
           )}
           {/* 删除 */}
           <button
             onClick={() => onDelete(project.id)}
-            className="flex items-center justify-center px-2 py-3 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors border-l border-border/60"
-            title="删除"
+            className="flex items-center justify-center px-2 py-2.5 font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors border-l border-border/60"
+            title="删除作品"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -676,41 +683,30 @@ export default function WorksPage() {
     if (abTickRef.current) { clearInterval(abTickRef.current); abTickRef.current = null; }
   }, []);
 
-const UNIQUE_THUMBNAILS: Record<string, string> = {
-  '/Video/CreatOK_2.mp4': 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=80',
-  '/Video/CreatOK_5.mp4': 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80',
-  '/Video/CreatOK_8.mp4': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80',
-  '/Video/CreatOK_10.mp4': 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&q=80',
-  '/Video/CreatOK_11.mp4': 'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=600&q=80',
-};
-
 async function seedTestUserVideos(userId: string) {
+  // 种子作品不再写入占位封面，由页面加载时自动提取原始 AI 视频首帧
   const testVideos = [
     {
       title: '时尚秋季外套女款展示',
       video_url: '/Video/CreatOK_2.mp4',
-      thumbnail_url: UNIQUE_THUMBNAILS['/Video/CreatOK_2.mp4'],
       duration: 5,
       video_style: '服装',
     },
     {
       title: '智能手表旋转展示',
       video_url: '/Video/CreatOK_5.mp4',
-      thumbnail_url: UNIQUE_THUMBNAILS['/Video/CreatOK_5.mp4'],
       duration: 10,
       video_style: '数码',
     },
     {
       title: '运动女鞋减震底测试',
       video_url: '/Video/CreatOK_8.mp4',
-      thumbnail_url: UNIQUE_THUMBNAILS['/Video/CreatOK_8.mp4'],
       duration: 5,
       video_style: '服装',
     },
     {
       title: '咖啡拿铁拉花艺术过程',
       video_url: '/Video/CreatOK_11.mp4',
-      thumbnail_url: UNIQUE_THUMBNAILS['/Video/CreatOK_11.mp4'],
       duration: 6,
       video_style: '食品',
     }
@@ -719,7 +715,7 @@ async function seedTestUserVideos(userId: string) {
   for (const v of testVideos) {
     const { data: existingProj } = await supabase
       .from('video_projects')
-      .select('id, thumbnail_url')
+      .select('id')
       .eq('user_id', userId)
       .eq('video_url', v.video_url)
       .maybeSingle();
@@ -731,7 +727,7 @@ async function seedTestUserVideos(userId: string) {
           user_id: userId,
           title: v.title,
           video_url: v.video_url,
-          thumbnail_url: v.thumbnail_url,
+          thumbnail_url: null,
           duration: v.duration,
           video_style: v.video_style,
           status: 'completed',
@@ -749,48 +745,34 @@ async function seedTestUserVideos(userId: string) {
           size: 1024 * 1024 * 5,
         });
       }
-    } else if (!existingProj.thumbnail_url || existingProj.thumbnail_url.includes('photo-1618005182384-a83a8bd57fbe')) {
-      await supabase.from('video_projects').update({ thumbnail_url: v.thumbnail_url }).eq('id', existingProj.id);
     }
   }
 }
 
   const loadProjects = async () => {
     setLoading(true);
-    // 自动清洗历史测试废弃项 "无线耳机落水测试"
-    try {
-      await supabase.from('video_projects').delete().eq('title', '无线耳机落水测试');
-      await supabase.from('materials').delete().eq('name', '无线耳机落水测试');
-    } catch (e) {
-      console.error('Clean legacy project err', e);
-    }
-
-    if (user?.email === 'test_user@example.com') {
-      await seedTestUserVideos(user.id);
-    }
     const { data } = await supabase.from('video_projects').select('*').order('created_at', { ascending: false });
     const formattedData = (data ?? [])
-      .filter((p: any) => p.title !== '无线耳机落水测试' && !p.title.includes('无线耳机落水测试'))
-      .map((p: any, idx: number) => {
-      let thumb = p.thumbnail_url;
-      if (!thumb || thumb.includes('photo-1618005182384-a83a8bd57fbe')) {
-        if (p.video_url && UNIQUE_THUMBNAILS[p.video_url]) {
-          thumb = UNIQUE_THUMBNAILS[p.video_url];
-        } else {
-          const defaultPool = [
-            'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=80',
-            'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80',
-            'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80',
-            'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&q=80',
-            'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=600&q=80',
-          ];
-          thumb = defaultPool[idx % defaultPool.length];
-        }
-      }
-      return { ...p, thumbnail_url: thumb };
-    });
-    setProjects(formattedData as VideoProject[]);
+      .map((p: any) => ({
+        ...p,
+        // 标题优先展示生成时对应的提示词
+        title: (p.prompt_text && String(p.prompt_text).trim()) ? String(p.prompt_text).trim() : p.title,
+        // 封面只保留真实帧（首帧截图/用户上传），占位图一律清空待异步首帧提取
+        thumbnail_url: isRealThumbnail(p.thumbnail_url) ? p.thumbnail_url : null,
+      })) as VideoProject[];
+    setProjects(formattedData);
     setLoading(false);
+    // 异步提取原始 AI 视频第一帧作为封面，并回写数据库保证后续加载一致
+    formattedData.forEach(prj => {
+      if (!prj.thumbnail_url && prj.video_url) {
+        extractVideoMeta(prj.video_url).then(meta => {
+          if (meta?.frame) {
+            setProjects(prev => prev.map(x => x.id === prj.id ? { ...x, thumbnail_url: meta.frame } : x));
+            supabase.from('video_projects').update({ thumbnail_url: meta.frame }).eq('id', prj.id).then(() => {});
+          }
+        });
+      }
+    });
   };
 
   useEffect(() => { loadProjects(); }, []);
@@ -1020,7 +1002,7 @@ async function seedTestUserVideos(userId: string) {
             }
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <Button
             variant={selectMode ? "secondary" : "outline"}
             size="sm"
@@ -1160,7 +1142,7 @@ async function seedTestUserVideos(userId: string) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filtered.map(p => (
                   <WorkCard key={p.id} project={p} onPreview={setPreviewProject} onDelete={setDeleteId}
-                    onAnalyze={id => navigate(`/analytics?projectId=${id}`)} onRetry={handleRetry} onReload={loadProjects}
+                    onAnalyze={id => navigate(`/data-feedback?projectId=${id}`)} onRetry={handleRetry} onReload={loadProjects}
                     selectMode={selectMode} isSelected={selectedIds.has(p.id)} onToggleSelect={toggleSelectItem} />
                 ))}
               </div>
@@ -1369,7 +1351,7 @@ async function seedTestUserVideos(userId: string) {
               <div className={cn("rounded-xl overflow-hidden bg-black relative flex items-center justify-center", previewAspect)}>
                 {(previewProject.video_url || previewProject.status === 'completed') ? (
                   <video
-                    src={previewProject.video_url || 'https://www.w3schools.com/html/mov_bbb.mp4'}
+                    src={previewProject.video_url || '/Video/CreatOK_2.mp4'}
                     controls
                     autoPlay
                     className="w-full h-full object-contain"

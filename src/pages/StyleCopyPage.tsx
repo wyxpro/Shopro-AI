@@ -706,12 +706,18 @@ export default function StyleCopyPage() {
                   基于提取的DNA指纹「{report.dna_fingerprint}」结合您的商品信息，生成风格高相似度的新视频脚本
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button className="flex-1 h-10" onClick={() => navigate('/script')}>
+                  <Button className="flex-1 h-10" onClick={() => {
+                    navigate('/script', { state: { styleReport: report } });
+                    toast.success('已携带当前爆款风格DNA进入带货脚本生成器！');
+                  }}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     应用DNA生成脚本
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
-                  <Button variant="outline" className="flex-1 h-10" onClick={() => navigate('/video/create')}>
+                  <Button variant="outline" className="flex-1 h-10" onClick={() => {
+                    navigate('/video/create', { state: { style: report.pacing, prompt: `爆款风格DNA: ${report.dna_fingerprint}，节奏: ${report.rhythm}，配色: ${report.color_tone}` } });
+                    toast.success('已应用当前风格进入视频生成工作台！');
+                  }}>
                     <Play className="w-4 h-4 mr-2" />直接生成视频
                   </Button>
                 </div>

@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  ResponsiveContainer, Tooltip, Legend,
-} from 'recharts';
+
 import {
   Wand2, Copy, BarChart3, BookOpen, Users2, Film,
   Zap, Star, ChevronLeft, ChevronRight, Check, ArrowRight,
   Sparkles, TrendingUp, Shield, Video, Play, Pause, Volume2, VolumeX, Maximize, Menu, X,
+  CheckCircle2, XCircle, Award, Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/common/PaymentDialog';
+import LandingHero from '@/components/LandingHero';
 
 // ── 型別 ─────────────────────────────────────────────────────────────────
 interface Particle {
@@ -191,15 +190,7 @@ function ReviewCard({ r }: { r: ReviewItem }) {
   );
 }
 
-// ── 雷达图数据 ────────────────────────────────────────────────────────────
-const radarData = [
-  { subject: '生成效率', 本产品: 95, 传统制作: 20, 基础AI工具: 60 },
-  { subject: '内容质量', 本产品: 88, 传统制作: 90, 基础AI工具: 60 },
-  { subject: '成本控制', 本产品: 92, 传统制作: 25, 基础AI工具: 70 },
-  { subject: '平台适配', 本产品: 90, 传统制作: 55, 基础AI工具: 65 },
-  { subject: '学习成本', 本产品: 85, 传统制作: 40, 基础AI工具: 72 },
-  { subject: '转化效果', 本产品: 87, 传统制作: 65, 基础AI工具: 58 },
-];
+
 
 // ── 用户评价数据 ──────────────────────────────────────────────────────────
 const reviews = [
@@ -361,7 +352,7 @@ const plans = [
   },
 ];
 
-// ── 特色功能数据 ──────────────────────────────────────────────────────────
+// ── 特色功能数据（配对应封面图） ─────────────────────────────────────────
 const features = [
   {
     icon: Wand2,
@@ -369,6 +360,7 @@ const features = [
     desc: '输入商品名称和卖点，AI 自动生成结构化分镜脚本与 Prompt 文案，省去 90% 策划时间。',
     color: '#FF6B00',
     glow: 'rgba(255,107,0,0.2)',
+    image: '/index/AI 智能脚本生成.png',
   },
   {
     icon: Copy,
@@ -376,6 +368,7 @@ const features = [
     desc: '上传参考视频，AI 提取节奏、转场、字幕风格并完整复刻，让每条视频都有爆款潜力。',
     color: '#00E599',
     glow: 'rgba(0,229,153,0.2)',
+    image: '/index/爆款风格复刻.png',
   },
   {
     icon: BarChart3,
@@ -383,6 +376,7 @@ const features = [
     desc: '基于视频特征预测完播率与互动率，提供精准优化建议，支持一键重新生成。',
     color: '#00B4D8',
     glow: 'rgba(0,180,216,0.2)',
+    image: '/index/流量预测分析.png',
   },
   {
     icon: BookOpen,
@@ -390,6 +384,7 @@ const features = [
     desc: '持续收集你的编辑行为与反馈，AI 越用越了解你的风格偏好，生成质量持续提升。',
     color: '#a78bfa',
     glow: 'rgba(167,139,250,0.2)',
+    image: '/index/知识库自进化.png',
   },
   {
     icon: Users2,
@@ -397,6 +392,7 @@ const features = [
     desc: '内置多风格数字人，支持中英双语，让带货主播直接出镜，提升视频专业度与信任感。',
     color: '#f472b6',
     glow: 'rgba(244,114,182,0.2)',
+    image: '/index/数字人库.png',
   },
   {
     icon: Film,
@@ -404,10 +400,11 @@ const features = [
     desc: '覆盖多种带货场景的专业模板，开箱测评、痛点解决、限时促销，一键调用即刻出片。',
     color: '#fbbf24',
     glow: 'rgba(251,191,36,0.2)',
+    image: '/index/视频模板库.png',
   },
 ];
 
-// ── 用户画像数据 ──────────────────────────────────────────────────────────
+// ── 用户画像数据（配对应封面图） ─────────────────────────────────────────
 const personas = [
   {
     emoji: '🛒',
@@ -417,6 +414,7 @@ const personas = [
     needs: '快速产出高质量带货视频，无需雇佣专业剪辑团队',
     pain: '视频制作周期长、成本高，跟不上平台流量热点',
     gain: '每月节省 ¥8,000+ 制作成本，出片速度提升 10x',
+    image: '/index/跨境电商.png',
   },
   {
     emoji: '🎬',
@@ -426,6 +424,7 @@ const personas = [
     needs: '批量生成高转化视频内容，统一管理多个账号',
     pain: '创作团队产能有限，难以规模化复制爆款内容',
     gain: '单人管理 10+ 账号，内容产出效率翻 5 倍',
+    image: '/index/mcn.png',
   },
   {
     emoji: '✨',
@@ -435,8 +434,169 @@ const personas = [
     needs: '低门槛制作专业视频，快速学习爆款创作技巧',
     pain: '缺乏专业技能，无法低成本制作高质量内容',
     gain: '从零基础到第一条破万播放，平均 3 天',
+    image: '/index/opc超级个体.png',
   },
 ];
+
+// ── 竞品对比六维矩阵深度调研数据 ─────────────────────────────────────────
+interface ComparisonRow {
+  dimension: string;
+  dimDesc: string;
+  icon: any;
+  ourProduct: {
+    title: string;
+    details: string;
+    highlight: string;
+  };
+  generalAi: {
+    title: string;
+    details: string;
+  };
+  avatarTool: {
+    title: string;
+    details: string;
+  };
+  traditionalMcn: {
+    title: string;
+    details: string;
+  };
+}
+
+const comparisonRows: ComparisonRow[] = [
+  {
+    dimension: '电商爆款脚本策划',
+    dimDesc: '卖点挖掘与黄金Hook',
+    icon: Wand2,
+    ourProduct: {
+      title: 'AI 自动提炼核心卖点',
+      details: '痛点拆解 + 黄金前3秒Hook · 内置上万套实战带货分镜',
+      highlight: '3秒完播率提升 61%',
+    },
+    generalAi: {
+      title: '需手工调试英文Prompt',
+      details: '无电商货盘认知 · 无法直接生成带货逻辑',
+    },
+    avatarTool: {
+      title: '仅提供通用企业讲稿',
+      details: '缺乏促单逻辑 · 需人工逐字撰写繁杂台词',
+    },
+    traditionalMcn: {
+      title: '编导团队人工策划',
+      details: '单条耗时 2~3 天 · 水准不稳定且成本高',
+    },
+  },
+  {
+    dimension: '拟真带货数字人',
+    dimDesc: '口型表现与多语种出海',
+    icon: Users2,
+    ourProduct: {
+      title: '超拟真带货主播阵列',
+      details: '手势与口型精准对齐 · 28+出海本土口音俚语',
+      highlight: '28+国出海语种全覆盖',
+    },
+    generalAi: {
+      title: '无专属带货主播',
+      details: '画面随机生成 · 面容与口型无法稳定保持',
+    },
+    avatarTool: {
+      title: '机械生硬站桩播报',
+      details: '多为企业宣讲会议形象 · 缺乏带货激情',
+    },
+    traditionalMcn: {
+      title: '高薪雇佣外模/真人',
+      details: '外模 ¥2,000+/场 · 跨国排期长沟通繁琐',
+    },
+  },
+  {
+    dimension: '分镜混剪与商品特写',
+    dimDesc: '多机位卡点与特效渲染',
+    icon: Film,
+    ourProduct: {
+      title: '全自动多机位分镜合成',
+      details: '手持特写与痛点场景混剪 · 智能卡点BGM花字',
+      highlight: '多机位智能卡点出片',
+    },
+    generalAi: {
+      title: '单段随机 5 秒画面',
+      details: '仅生成单一镜头短片 · 无法识别商品特写混剪',
+    },
+    avatarTool: {
+      title: '单一机位站桩播报',
+      details: '无商品特写分镜与转场切片 · 视觉枯燥易跳出',
+    },
+    traditionalMcn: {
+      title: '后期逐帧人工剪辑',
+      details: '依赖专业摄影棚拍摄 · 剪辑后期周期长成本高',
+    },
+  },
+  {
+    dimension: '带货促单营销组件',
+    dimDesc: '小黄车与优惠券ROI闭环',
+    icon: Zap,
+    ourProduct: {
+      title: '原生带货促单营销挂件',
+      details: '内置小黄车/立减券/买家动态弹幕/热卖角标',
+      highlight: '带货 ROI 提升 4.8x',
+    },
+    generalAi: {
+      title: '零电商转化组件',
+      details: '纯影视短片 · 无法挂载任何电商促单营销挂件',
+    },
+    avatarTool: {
+      title: '仅支持基础静态字幕',
+      details: '无营销浮层与互动组件 · 转化率极低',
+    },
+    traditionalMcn: {
+      title: '美工额外包装贴片',
+      details: '需平面美工单独设计贴片 · 增加协作链条',
+    },
+  },
+  {
+    dimension: '生成效率与矩阵铺量',
+    dimDesc: '极速出片与批量高并发',
+    icon: Sparkles,
+    ourProduct: {
+      title: '48 秒极速出片 · 批量矩阵',
+      details: '平均 48 秒/条 · 一键批量生成 100+ 组多语言带货切片',
+      highlight: '48秒极速生成 · 规模化',
+    },
+    generalAi: {
+      title: '排队 3~10 分钟/条',
+      details: '生成耗时漫长且偶发失败 · 难以批量高并发测款',
+    },
+    avatarTool: {
+      title: '单条渲染 5~15 分钟',
+      details: '逐条排队合成 · 缺乏针对电商快速批量测款能力',
+    },
+    traditionalMcn: {
+      title: '制作周期 3~7 天/条',
+      details: '流程笨重缓慢 · 容易错失爆款热点流量',
+    },
+  },
+  {
+    dimension: '单条综合制作成本',
+    dimDesc: '综合成本与试错门槛',
+    icon: TrendingUp,
+    ourProduct: {
+      title: '低至 ¥0.5 / 条（降本99%）',
+      details: '单条低至几毛钱 · 极低试错成本撬动海量自然与付费流',
+      highlight: '低至 ¥0.5/条 · 首批免费',
+    },
+    generalAi: {
+      title: '约 ¥15 ~ ¥30 / 条',
+      details: '算力扣点昂贵 · 废片率高实际单条成本不可控',
+    },
+    avatarTool: {
+      title: '约 ¥10 ~ ¥50 / 条',
+      details: '采用按分钟的高额订阅制 · 批量制作成本压力大',
+    },
+    traditionalMcn: {
+      title: '¥800 ~ ¥3,000 / 条',
+      details: '场地设备与主播人工薪酬高 · 中小团队无力承担',
+    },
+  },
+];
+
 
 // ── 统计数据 ──────────────────────────────────────────────────────────────
 const stats = [
@@ -768,107 +928,14 @@ export default function LandingPage() {
       </nav>
 
       {/* ══════════════════════════════════════════════════════
-          HERO 区
+          HERO 区 (3D & 电商 AIGC 视觉沉浸优化)
       ══════════════════════════════════════════════════════ */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden landing-hero-bg pt-16">
-        <ParticleField />
-
-        {/* 光晕装饰 */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full pointer-events-none animate-glow-pulse"
-          style={{ background: 'radial-gradient(circle, rgba(255,107,0,0.15) 0%, transparent 70%)', filter: 'blur(40px)' }} />
-        <div className="absolute bottom-1/4 right-1/4 w-72 h-72 rounded-full pointer-events-none animate-glow-pulse"
-          style={{ background: 'radial-gradient(circle, rgba(0,229,153,0.12) 0%, transparent 70%)', filter: 'blur(40px)', animationDelay: '1.5s' }} />
-
-        <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-8 text-center py-20 md:py-32">
-          {/* 标签 */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-semibold mb-8 tracking-wide"
-            style={{ borderColor: 'rgba(255,107,0,0.4)', background: 'rgba(255,107,0,0.08)', color: '#FF6B00' }}>
-            <Zap className="w-3 h-3" />
-            AI 驱动 · 低成本 · 高转化
-          </div>
-
-          {/* 主标题 */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold leading-tight mb-6 text-balance">
-            <span className="text-white">一键批量生成</span>
-            <br />
-            <span className="landing-gradient-text">TikTok跨境电商带货视频</span>
-          </h1>
-
-          <p className="text-lg md:text-xl text-white/55 max-w-2xl mx-auto mb-10 leading-relaxed text-pretty">
-            AI 全流程辅助 · 从商品信息到带货短视频
-            <br className="hidden md:block" />
-            无需专业剪辑，1分钟产出高转化内容
-          </p>
-
-          {/* CTA 按钮组 */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button
-              onClick={goToApp}
-              className="group relative px-8 py-4 rounded-xl text-base font-bold text-white overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl animate-border-glow"
-              style={{ background: 'linear-gradient(135deg, #FF6B00 0%, #ff9500 100%)' }}
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                <Play className="w-4 h-4" />
-                立即免费使用
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </span>
-              {/* 光晕扫描线 */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity"
-                style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)', animation: 'scan-line 1s ease infinite' }} />
-            </button>
-
-            <a
-              href="https://my.feishu.cn/wiki/FF9KwlgBQihnK5kkzT5c6lI5nub?from=from_copylink"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-8 py-4 rounded-xl text-base font-semibold text-white/80 border border-white/15 hover:border-white/35 hover:text-white transition-all duration-200 hover:bg-white/5 backdrop-blur-sm"
-            >
-              开源文档
-            </a>
-          </div>
-
-          {/* 信任信号 */}
-          <div className="flex flex-wrap gap-6 justify-center mt-12 text-sm text-white/35">
-            {['无需信用卡', '免费开始', '5 分钟上手', '7 天无理由退款'].map(t => (
-              <span key={t} className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-green-400" />{t}
-              </span>
-            ))}
-          </div>
-
-          {/* 模拟截图光晕卡片 */}
-          <div className="mt-16 relative max-w-4xl mx-auto">
-            <div className="absolute inset-0 rounded-2xl pointer-events-none"
-              style={{ boxShadow: '0 0 80px rgba(255,107,0,0.15), 0 0 160px rgba(0,229,153,0.08)' }} />
-            <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/3 backdrop-blur-sm p-6 md:p-8">
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                {[
-                  { label: '脚本生成中', val: '▓▓▓▓▓▓▓░░░', color: '#FF6B00' },
-                  { label: '分镜解析', val: '▓▓▓▓▓▓▓▓▓░', color: '#00E599' },
-                  { label: '视频合成', val: '▓▓▓▓▓░░░░░', color: '#00B4D8' },
-                ].map(({ label, val, color }) => (
-                  <div key={label} className="rounded-lg p-3 text-left" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <p className="text-[10px] text-white/40 mb-1">{label}</p>
-                    <p className="text-xs font-mono" style={{ color }}>{val}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="rounded-xl p-4 text-left" style={{ background: 'rgba(255,107,0,0.06)', border: '1px solid rgba(255,107,0,0.15)' }}>
-                <p className="text-[10px] text-white/30 mb-2 font-mono">AI 生成脚本预览</p>
-                <div className="space-y-1.5">
-                  {[
-                    '场景 01 | 开场钩子 | 3s | 镜头快速推进，展示产品特写...',
-                    '场景 02 | 痛点共鸣 | 4s | 对比画面：使用前后场景切换...',
-                    '场景 03 | 产品展示 | 6s | 多角度展示，突出核心功能...',
-                  ].map((line, i) => (
-                    <p key={i} className="text-xs font-mono text-white/50">{line}</p>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <LandingHero
+        onGoToApp={goToApp}
+        onScrollToPromo={() => {
+          document.getElementById('功能')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
 
       {/* ══════════════════════════════════════════════════════
           统计数据
@@ -905,19 +972,38 @@ export default function LandingPage() {
             title={<>谁在用 <span style={{ color: '#FF6B00' }}>电商AIGC</span>？</>}
             sub="我们服务各类电商从业者，帮助他们以最低成本产出最高转化内容"
           />
-          <div className="flex md:grid md:grid-cols-3 overflow-x-auto md:overflow-x-visible pb-6 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 gap-6 snap-x snap-mandatory scrollbar-none">
+          <div className="flex md:grid md:grid-cols-3 overflow-x-auto md:overflow-x-visible pb-6 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 gap-6 snap-x snap-mandatory scrollbar-none items-stretch">
             {personas.map((p, i) => {
               const { ref, inView } = useInView(0.15);
               return (
                 <div key={p.role} ref={ref}
-                  className={cn('transition-all duration-700 w-[80vw] sm:w-[350px] md:w-auto shrink-0 snap-center', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
+                  className={cn(
+                    'transition-all duration-700 w-[82vw] sm:w-[350px] md:w-auto shrink-0 snap-center flex flex-col self-stretch min-h-[510px] md:min-h-0',
+                    inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                  )}
                   style={{ transitionDelay: `${i * 120}ms` }}>
-                  <TiltCard>
-                    <div className="rounded-2xl p-6 h-full landing-card-dark transition-all duration-300 hover:shadow-2xl"
+                  <TiltCard className="h-full flex-1 flex flex-col self-stretch">
+                    <div className="rounded-2xl p-5 h-full landing-card-dark transition-all duration-300 hover:shadow-2xl flex flex-col justify-between flex-1 self-stretch"
                       style={{ '--hover-glow': p.color } as React.CSSProperties}>
-                      <div className="text-4xl mb-4">{p.emoji}</div>
-                      <h3 className="text-lg font-bold text-white mb-3 text-balance">{p.role}</h3>
-                      <div className="flex flex-wrap gap-1.5 mb-4">
+                      
+                      {/* 人物画像对应真实头像/形象图 */}
+                      <div className="relative w-full h-44 rounded-xl overflow-hidden mb-4 border border-white/10 group bg-black/40 shrink-0">
+                        <img
+                          src={p.image}
+                          alt={p.role}
+                          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#10131a] via-[#10131a]/30 to-transparent" />
+                        <div className="absolute bottom-2.5 left-3 flex items-center gap-2">
+                          <span className="text-2xl drop-shadow">{p.emoji}</span>
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-white border border-white/15">
+                            {p.role}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 标签列表 */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-4 shrink-0 min-h-[30px]">
                         {p.tags.map(t => (
                           <span key={t} className="text-xs px-2 py-0.5 rounded-full"
                             style={{ background: `${p.color}18`, color: p.color, border: `1px solid ${p.color}30` }}>
@@ -925,18 +1011,20 @@ export default function LandingPage() {
                           </span>
                         ))}
                       </div>
-                      <div className="space-y-3 text-sm">
-                        <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+
+                      {/* 三联核心内容块（等高自适应） */}
+                      <div className="space-y-3 text-sm flex-1 flex flex-col justify-between">
+                        <div className="p-3 rounded-xl min-h-[70px] flex flex-col justify-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                           <p className="text-white/40 text-xs mb-1">核心需求</p>
-                          <p className="text-white/75 text-pretty">{p.needs}</p>
+                          <p className="text-white/75 text-pretty leading-relaxed text-xs sm:text-sm">{p.needs}</p>
                         </div>
-                        <div className="p-3 rounded-xl" style={{ background: 'rgba(255,60,60,0.05)', border: '1px solid rgba(255,60,60,0.1)' }}>
+                        <div className="p-3 rounded-xl min-h-[70px] flex flex-col justify-center" style={{ background: 'rgba(255,60,60,0.05)', border: '1px solid rgba(255,60,60,0.1)' }}>
                           <p className="text-red-400/60 text-xs mb-1">痛点</p>
-                          <p className="text-white/60 text-pretty">{p.pain}</p>
+                          <p className="text-white/60 text-pretty leading-relaxed text-xs sm:text-sm">{p.pain}</p>
                         </div>
-                        <div className="p-3 rounded-xl" style={{ background: `${p.color}08`, border: `1px solid ${p.color}20` }}>
+                        <div className="p-3 rounded-xl min-h-[70px] flex flex-col justify-center" style={{ background: `${p.color}08`, border: `1px solid ${p.color}20` }}>
                           <p className="text-xs mb-1" style={{ color: `${p.color}99` }}>使用后收益</p>
-                          <p className="font-semibold text-pretty" style={{ color: p.color }}>{p.gain}</p>
+                          <p className="font-semibold text-pretty leading-relaxed text-xs sm:text-sm" style={{ color: p.color }}>{p.gain}</p>
                         </div>
                       </div>
                     </div>
@@ -966,17 +1054,30 @@ export default function LandingPage() {
                   className={cn('transition-all duration-700', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}
                   style={{ transitionDelay: `${i * 80}ms` }}>
                   <TiltCard className="h-full">
-                    <div className="rounded-2xl p-4 sm:p-6 h-full group cursor-default landing-card-dark transition-all duration-300 hover:shadow-xl"
+                    <div className="rounded-2xl p-3.5 sm:p-5 h-full group cursor-default landing-card-dark transition-all duration-300 hover:shadow-xl flex flex-col"
                       style={{ '--glow': f.glow } as React.CSSProperties}>
-                      <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center transition-transform duration-200 group-hover:scale-110"
-                        style={{ background: f.glow, border: `1px solid ${f.color}30` }}>
-                        <f.icon className="w-6 h-6" style={{ color: f.color }} />
+                      
+                      {/* 核心功能对应图片展示（高度按图片真实比例放大，确保封面完整显示） */}
+                      <div className="relative w-full aspect-[1504/1046] rounded-xl overflow-hidden mb-3.5 border border-white/10 bg-black/40 group-hover:border-white/25 transition-colors">
+                        <img
+                          src={f.image}
+                          alt={f.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 filter brightness-[0.88]"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0e1118] via-[#0e1118]/25 to-transparent" />
+                        <div
+                          className="absolute top-2.5 left-2.5 w-8 h-8 rounded-lg flex items-center justify-center shadow-lg backdrop-blur-md"
+                          style={{ background: `${f.color}30`, border: `1px solid ${f.color}60` }}
+                        >
+                          <f.icon className="w-4 h-4" style={{ color: f.color }} />
+                        </div>
                       </div>
-                      <h3 className="text-base font-bold text-white mb-2 text-balance">{f.title}</h3>
-                      <p className="text-sm text-white/50 leading-relaxed text-pretty">{f.desc}</p>
+
+                      <h3 className="text-base font-bold text-white mb-1.5 text-balance">{f.title}</h3>
+                      <p className="text-xs sm:text-sm text-white/50 leading-relaxed text-pretty flex-1">{f.desc}</p>
 
                       {/* 底部装饰线 */}
-                      <div className="mt-4 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                      <div className="mt-3 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                         style={{ background: `linear-gradient(90deg, ${f.color}, transparent)` }} />
                     </div>
                   </TiltCard>
@@ -988,60 +1089,188 @@ export default function LandingPage() {
       </section>
 
       {/* ══════════════════════════════════════════════════════
-          竞品分析（雷达图）
+          竞品分析（重磅全新设计：六维带货竞品全面对比表格）
       ══════════════════════════════════════════════════════ */}
-      <section id="竞品对比" className="py-24 landing-section-dark">
-        <div className="max-w-6xl mx-auto px-4 md:px-8">
+      <section id="竞品对比" className="py-24 landing-section-dark relative overflow-hidden">
+        {/* 背景微弱环境辉光 */}
+        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-[600px] h-[350px] bg-orange-500/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-[600px] h-[350px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
           <SectionTitle
             tag="竞品对比"
             title={<>为什么选择<br /><span style={{ color: '#00E599' }}>电商AIGC</span>？</>}
             sub="与传统视频制作和基础AI工具的六维全面对比"
           />
 
-          <div ref={radarRef}
-            className={cn('grid grid-cols-1 lg:grid-cols-2 gap-8 items-center transition-all duration-1000',
-              radarInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12')}>
-            {/* 雷达图 */}
-            <div className="rounded-2xl p-6 landing-card-dark">
-              <ResponsiveContainer width="100%" height={340}>
-                <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-                  <PolarGrid stroke="rgba(255,255,255,0.08)" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 500 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }} />
-                  <Tooltip
-                    contentStyle={{ background: '#1a1d24', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: 12 }}
-                    labelStyle={{ color: 'rgba(255,255,255,0.7)' }}
-                  />
-                  <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, paddingTop: 16 }} />
-                  <Radar name="本产品" dataKey="本产品" stroke="#FF6B00" fill="#FF6B00" fillOpacity={0.25} strokeWidth={2} dot={{ fill: '#FF6B00', r: 4 }} />
-                  <Radar name="传统制作" dataKey="传统制作" stroke="rgba(255,255,255,0.3)" fill="rgba(255,255,255,0.05)" strokeWidth={1.5} strokeDasharray="4 4" />
-                  <Radar name="基础AI工具" dataKey="基础AI工具" stroke="#00E599" fill="#00E599" fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="6 3" />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
+          {/* ════════ 全新六维矩阵对比表格（突出本项目位于对比左侧首列） ════════ */}
+          <div
+            ref={radarRef}
+            className={cn(
+              'transition-all duration-1000',
+              radarInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            )}
+          >
+            {/* 表格容器 */}
+            <div className="rounded-2xl border border-white/10 bg-[#0f1219]/90 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden">
+              <div className="overflow-x-auto scrollbar-none">
+                <table className="w-full min-w-[920px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/[0.02]">
+                      {/* 维度列 */}
+                      <th className="py-5 px-5 text-sm font-semibold text-white/50 w-[18%]">
+                        <div className="flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-white/40" />
+                          <span>六大对比维度</span>
+                        </div>
+                      </th>
 
-            {/* 对比说明 */}
-            <div className="space-y-4">
-              {[
-                { dim: '生成效率', our: 95, desc: '20 分钟完成传统制作 2 天的工作量', color: '#FF6B00' },
-                { dim: '成本控制', our: 92, desc: '月均节省 ¥8,000+ 人力与制作成本', color: '#FF6B00' },
-                { dim: '平台适配', our: 90, desc: '抖音/TikTok 双平台风格自动适配', color: '#00E599' },
-                { dim: '转化效果', our: 87, desc: '基于爆款学习的高转化内容生成', color: '#00E599' },
-              ].map(({ dim, our, desc, color }) => (
-                <div key={dim} className="rounded-xl p-4 landing-card-dark">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-white">{dim}</span>
-                    <span className="text-sm font-bold" style={{ color }}>{our}分</span>
-                  </div>
-                  <div className="h-1.5 rounded-full mb-2" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    {radarInView && (
-                      <div className="h-full rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${our}%`, background: `linear-gradient(90deg, ${color}, ${color}80)` }} />
-                    )}
-                  </div>
-                  <p className="text-xs text-white/40 text-pretty">{desc}</p>
+                      {/* 🌟 核心高亮：Shopro 电商AIGC (本项目 - 位于表格左侧第一列) */}
+                      <th className="py-5 px-5 w-[30%] bg-gradient-to-b from-orange-500/15 via-orange-500/8 to-transparent border-x-2 border-t-2 border-orange-500/60 relative">
+                        <div className="absolute -top-px left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-b-md bg-gradient-to-r from-orange-500 to-amber-500 text-[10px] font-extrabold text-white tracking-wider uppercase shadow-md flex items-center gap-1">
+                          <Award className="w-3 h-3" />
+                          TOP 推荐 · 电商爆款首选
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <div>
+                            <span className="text-base font-black text-white flex items-center gap-1.5">
+                              Shopro 电商AIGC
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-[#FF6B00] border border-orange-500/40 font-mono">
+                                4.0
+                              </span>
+                            </span>
+                            <p className="text-xs text-[#00E599] font-medium mt-0.5">全流程带货闭环 · 产出即爆单</p>
+                          </div>
+                          <span className="text-xl">🚀</span>
+                        </div>
+                      </th>
+
+                      {/* 竞品 1：通用视频 AI 大模型 */}
+                      <th className="py-5 px-4 text-xs font-semibold text-white/70 w-[18%] border-r border-white/5 bg-white/[0.01]">
+                        <p className="text-sm font-bold text-white/90">通用视频 AI</p>
+                        <p className="text-[11px] text-white/40 font-normal mt-0.5">Sora / Runway / Kling 等</p>
+                      </th>
+
+                      {/* 竞品 2：基础数字人软件 */}
+                      <th className="py-5 px-4 text-xs font-semibold text-white/70 w-[17%] border-r border-white/5 bg-white/[0.01]">
+                        <p className="text-sm font-bold text-white/90">基础数字人工具</p>
+                        <p className="text-[11px] text-white/40 font-normal mt-0.5">HeyGen / 剪映数字人等</p>
+                      </th>
+
+                      {/* 竞品 3：传统人工拍摄与MCN */}
+                      <th className="py-5 px-4 text-xs font-semibold text-white/70 w-[17%] bg-white/[0.01]">
+                        <p className="text-sm font-bold text-white/90">传统实拍与MCN</p>
+                        <p className="text-[11px] text-white/40 font-normal mt-0.5">外包拍摄团队 / 摄影棚</p>
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-white/5 text-xs">
+                    {comparisonRows.map((row, idx) => {
+                      const IconComponent = row.icon;
+                      return (
+                        <tr key={row.dimension} className="hover:bg-white/[0.015] transition-colors group">
+                          {/* 维度描述 */}
+                          <td className="py-4 px-5 align-top">
+                            <div className="flex items-start gap-2.5">
+                              <div className="p-1.5 rounded-lg bg-white/5 text-orange-400 group-hover:bg-orange-500/15 transition-colors shrink-0 mt-0.5">
+                                <IconComponent className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-white text-sm leading-snug">{row.dimension}</p>
+                                <p className="text-[11px] text-white/40 mt-0.5">{row.dimDesc}</p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 🌟 我们的产品 (高亮第一列) */}
+                          <td className="py-4 px-5 align-top bg-gradient-to-b from-orange-500/[0.06] to-transparent border-x-2 border-orange-500/40 relative">
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-1.5 text-[#00E599] font-bold text-xs">
+                                <CheckCircle2 className="w-4 h-4 shrink-0 fill-[#00E599]/20" />
+                                <span>{row.ourProduct.title}</span>
+                              </div>
+                              <p className="text-white/75 text-[11px] leading-relaxed text-pretty">
+                                {row.ourProduct.details}
+                              </p>
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-[10px] font-medium text-orange-300">
+                                <span>✨</span>
+                                <span>{row.ourProduct.highlight}</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 通用视频AI */}
+                          <td className="py-4 px-4 align-top text-white/55 border-r border-white/5">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-white/80 flex items-center gap-1 text-[11px]">
+                                <XCircle className="w-3.5 h-3.5 text-red-400/80 shrink-0" />
+                                {row.generalAi.title}
+                              </p>
+                              <p className="text-[11px] text-white/40 leading-relaxed text-pretty">
+                                {row.generalAi.details}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* 基础数字人 */}
+                          <td className="py-4 px-4 align-top text-white/55 border-r border-white/5">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-white/80 flex items-center gap-1 text-[11px]">
+                                <XCircle className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
+                                {row.avatarTool.title}
+                              </p>
+                              <p className="text-[11px] text-white/40 leading-relaxed text-pretty">
+                                {row.avatarTool.details}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* 传统实拍与MCN */}
+                          <td className="py-4 px-4 align-top text-white/55">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-white/80 flex items-center gap-1 text-[11px]">
+                                <XCircle className="w-3.5 h-3.5 text-red-400/80 shrink-0" />
+                                {row.traditionalMcn.title}
+                              </p>
+                              <p className="text-[11px] text-white/40 leading-relaxed text-pretty">
+                                {row.traditionalMcn.details}
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 底部保障与行动通栏 */}
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-orange-500/10 via-emerald-500/5 to-transparent border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-white/70">
+                  <span className="flex items-center gap-1.5 text-white font-medium">
+                    <Check className="w-4 h-4 text-[#00E599]" />
+                    专注电商短视频转化
+                  </span>
+                  <span className="flex items-center gap-1.5 text-white font-medium">
+                    <Check className="w-4 h-4 text-[#00E599]" />
+                    全自动分镜+出海多语言
+                  </span>
+                  <span className="flex items-center gap-1.5 text-white font-medium">
+                    <Check className="w-4 h-4 text-[#00E599]" />
+                    低至 ¥0.5/条，注册即享 5 个免费名额
+                  </span>
                 </div>
-              ))}
+
+                <button
+                  onClick={goToApp}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 transition-all shadow-[0_0_20px_rgba(255,107,0,0.35)] hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                  立即体验 Shopro 电商AIGC
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
