@@ -282,7 +282,11 @@ export default function LandingHero({ onGoToApp, onScrollToPromo }: LandingHeroP
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="relative min-h-[92vh] lg:min-h-screen flex flex-col justify-center overflow-hidden landing-hero-bg pt-20 pb-12 sm:pt-24 sm:pb-16 select-none"
+      className={cn(
+        'relative min-h-[92vh] lg:min-h-screen flex flex-col justify-center overflow-hidden landing-hero-bg pt-20 pb-12 sm:pt-24 sm:pb-16 touch-manipulation',
+        // 移动端保留文本选择能力，避免部分触屏浏览器 user-select:none 吞掉首击
+        !isMobile && 'select-none'
+      )}
     >
       {/* ── 背景网格与光晕层 ── */}
       <div className="absolute inset-0 hero-cyber-grid opacity-70 pointer-events-none" />
@@ -327,11 +331,12 @@ export default function LandingHero({ onGoToApp, onScrollToPromo }: LandingHeroP
             </div>
 
             {/* 主标题 */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.12] mb-5 text-balance">
-              <span className="text-white drop-shadow-sm">一键批量生成</span>
-              <br />
-              <span className="landing-gradient-text drop-shadow-[0_4px_30px_rgba(255,107,0,0.35)]">
-                TikTok 跨境带货短视频
+            <h1 className="font-black tracking-tight mb-6 flex flex-col items-center lg:items-start gap-3 sm:gap-4 lg:gap-5">
+              <span className="text-3xl sm:text-5xl lg:text-6xl text-white drop-shadow-sm leading-tight">
+                让全球生意更简单！
+              </span>
+              <span className="landing-gradient-text drop-shadow-[0_4px_30px_rgba(255,107,0,0.35)] whitespace-nowrap text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-[42px] xl:text-5xl 2xl:text-6xl leading-tight lg:-ml-10 xl:-ml-16 2xl:-ml-[88px]">
+                跨境电商AIGC带货视频生成
               </span>
             </h1>
 
@@ -432,10 +437,12 @@ export default function LandingHero({ onGoToApp, onScrollToPromo }: LandingHeroP
                 isHovered ? 'shadow-[0_25px_90px_rgba(255,107,0,0.35)]' : 'shadow-[0_20px_70px_rgba(0,0,0,0.85)]'
               )}
               style={{
-                perspective: '1200px',
+                // 移动端关闭 3D 透视与倾斜变换：避免触屏命中检测偏移导致屏幕内组件点击失效
+                perspective: isMobile ? undefined : '1200px',
                 transform: isMobile
-                  ? 'rotateX(3deg) rotateY(-2deg)'
+                  ? 'none'
                   : `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) translateZ(10px)`,
+                touchAction: 'manipulation',
               }}
             >
               {/* 3D 地盘全息投影基座 */}
@@ -478,8 +485,8 @@ export default function LandingHero({ onGoToApp, onScrollToPromo }: LandingHeroP
                 {/* 金属边框高光 */}
                 <div className="absolute inset-0 rounded-[40px] border border-orange-500/25 pointer-events-none" />
 
-                {/* 屏幕内芯：抖音/TikTok 直播全屏视窗 */}
-                <div className="relative w-full h-full rounded-[32px] bg-black overflow-hidden flex flex-col border border-white/10 select-none">
+                {/* 屏幕内芯：抖音/TikTok 直播全屏视窗（touch-manipulation 去除移动端 300ms 点击延迟） */}
+                <div className="relative w-full h-full rounded-[32px] bg-black overflow-hidden flex flex-col border border-white/10 select-none touch-manipulation">
 
                   {/* ── 轮播商品主图（通透清晰，大幅减少暗色遮罩） ── */}
                   <div className="absolute inset-0 z-0">

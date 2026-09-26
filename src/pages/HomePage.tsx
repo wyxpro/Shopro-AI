@@ -1786,18 +1786,19 @@ export default function HomePage() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
-      <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 space-y-10">
+      {/* 移动端收紧外边距与区块间距，保证紧凑屏幕下排版合理 */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-8 py-5 md:py-10 space-y-6 md:space-y-10">
 
         {/* ── 大标题 ────────────────────────────────────────────────── */}
-        <div className="text-center space-y-5">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-balance leading-tight">
+        <div className="text-center space-y-3.5 md:space-y-5">
+          <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-balance leading-tight">
             生成、编辑或复刻电商带货视频
           </h1>
           {/* 主 Tab */}
           <div className="inline-flex items-center gap-1 p-1 rounded-full border border-white/10 bg-white/5 backdrop-blur">
             {MAIN_TABS.map(t => (
               <button key={t} onClick={() => setMainTab(t)}
-                className={cn('px-5 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
+                className={cn('px-3 sm:px-5 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200',
                   mainTab === t ? 'bg-white text-black shadow' : 'text-white/60 hover:text-white/90')}
               >{t}</button>
             ))}
@@ -1848,9 +1849,9 @@ export default function HomePage() {
             </div>
 
             <div className="relative z-10 rounded-[14.5px] bg-[#16151f] border border-white/5 transition-all duration-300">
-              {/* 顶部 Tab + 展开按钮 */}
-              <div className="flex items-center justify-between px-3 md:px-4 pt-3 pb-1">
-                <div className="flex items-center gap-0.5 overflow-x-auto">
+              {/* 顶部 Tab + 展开按钮（移动端缩小字号与内边距） */}
+              <div className="flex items-center justify-between px-2.5 md:px-4 pt-2.5 md:pt-3 pb-1">
+                <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar">
                   {INPUT_TABS.map(t => (
                     <button key={t} onClick={() => {
                       setInputTab(t);
@@ -1859,7 +1860,7 @@ export default function HomePage() {
                         loadProductsForSelector();
                       }
                     }}
-                      className={cn('flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap shrink-0',
+                      className={cn('flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs md:text-sm transition-colors whitespace-nowrap shrink-0',
                         inputTab === t ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70')}
                     >
                       {t === '参考' && <ImageIcon className="w-3.5 h-3.5" />}
@@ -2126,7 +2127,7 @@ export default function HomePage() {
                     )}
                   </div>
                   <textarea
-                    rows={3}
+                    rows={2}
                     value={prompt}
                     onChange={e => {
                       setPrompt(e.target.value);
@@ -2136,7 +2137,7 @@ export default function HomePage() {
                     onCompositionUpdate={() => triggerVideoTypingGlow()}
                     placeholder="描述视频画面内容和动态过程，使用 @ 指定参考图或参考视频"
                     className={cn(
-                      "flex-1 min-w-0 bg-transparent resize-none text-sm text-white/80 placeholder:text-white/25 outline-none min-h-[72px] leading-relaxed transition-all duration-300",
+                      "flex-1 min-w-0 bg-transparent resize-none text-sm text-white/80 placeholder:text-white/25 outline-none min-h-[56px] sm:min-h-[72px] leading-relaxed transition-all duration-300",
                       enhancing && "enhancing-text-wave"
                     )}
                     disabled={generating || enhancing}
@@ -2248,13 +2249,13 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* 底部工具栏 */}
-              <div className="flex items-center justify-between px-3 md:px-4 pb-3 pt-2 border-t border-white/5 gap-2 w-full">
-                <div className="flex items-center gap-1.5 py-0.5 pr-2">
+              {/* 底部工具栏（移动端缩小胶囊尺寸，保证单行不拥挤） */}
+              <div className="flex items-center justify-between px-2.5 md:px-4 pb-2.5 md:pb-3 pt-2 border-t border-white/5 gap-1.5 md:gap-2 w-full">
+                <div className="flex items-center gap-1 md:gap-1.5 py-0.5 md:pr-2 min-w-0">
                   {/* 模型选择 */}
                   <div className="relative">
                     <button onClick={() => { setModelOpen(o => !o); setResOpen(false); }}
-                      className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/15 text-xs text-emerald-400 transition-colors border border-emerald-500/20">
+                      className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/15 text-[11px] md:text-xs text-emerald-400 transition-colors border border-emerald-500/20">
                       {(() => {
                         const currentModelObj = MODELS.find(m => m.id === model.id);
                         return <span className="text-sm leading-none">{currentModelObj?.iconSymbol || '⚡'}</span>;
@@ -2303,14 +2304,14 @@ export default function HomePage() {
                   {/* 分辨率与高级参数弹窗 */}
                   <div className="relative">
                     <button onClick={() => { setResOpen(o => !o); setModelOpen(false); }}
-                      className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/15 text-xs text-blue-400 transition-colors border border-blue-500/20">
+                      className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/15 text-[11px] md:text-xs text-blue-400 transition-colors border border-blue-500/20">
                       <BarChart2 className="w-3 h-3" />
                       <span className="hidden sm:inline">{resolution}</span>
                       <span className="sm:hidden">尺寸</span>
                       <ChevronDown className="w-3 h-3" />
                     </button>
                     {resOpen && (
-                      <div className="absolute top-full mt-2 left-0 z-50 bg-[#161522] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-4 w-[320px] space-y-4 text-white backdrop-blur-2xl">
+                      <div className="absolute top-full mt-2 left-0 z-50 bg-[#161522] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-3 md:p-4 w-[calc(100vw-2rem)] max-w-[320px] space-y-3 md:space-y-4 text-white backdrop-blur-2xl">
                         {/* 分辨率 */}
                         <div className="space-y-2">
                           <label className="text-[11px] text-white/40 block font-medium">分辨率</label>
@@ -2406,7 +2407,7 @@ export default function HomePage() {
                   </div>
 
                   <button onClick={handleEnhancePrompt} disabled={enhancing || generating}
-                    className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/15 text-xs text-pink-400 transition-colors border border-pink-500/20 disabled:opacity-40 shrink-0">
+                    className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/15 text-[11px] md:text-xs text-pink-400 transition-colors border border-pink-500/20 disabled:opacity-40 shrink-0">
                     {enhancing ? <Loader2 className="w-3 h-3 animate-spin text-pink-400" /> : <Sparkles className="w-3 h-3 text-pink-400" />}
                     <span className="hidden sm:inline">提示词增强</span>
                   </button>
@@ -2416,7 +2417,7 @@ export default function HomePage() {
                   <span className="text-xs text-white/25 hidden sm:block">{prompt.length}/8000</span>
                   {generating ? (
                     <button onClick={() => { stopPoll(); setGenerating(false); setGenProgress(0); }}
-                      className="flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:px-3 sm:py-2 rounded-xl text-sm font-semibold transition-all shrink-0"
+                      className="flex items-center justify-center gap-1.5 w-8 h-8 md:w-9 md:h-9 sm:w-auto sm:h-auto sm:px-3 sm:py-2 rounded-xl text-sm font-semibold transition-all shrink-0"
                       style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444' }}>
                       <X className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">取消</span>
@@ -2427,7 +2428,7 @@ export default function HomePage() {
                         type="button"
                         onClick={handleVoiceInput}
                         className={cn(
-                          "w-9 h-9 rounded-xl flex items-center justify-center transition-all border shrink-0",
+                          "w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center transition-all border shrink-0",
                           recording
                             ? "animate-pulse border-red-500/50 text-red-500 bg-red-500/10"
                             : "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300"
@@ -2436,7 +2437,7 @@ export default function HomePage() {
                         <Mic className="w-4 h-4" />
                       </button>
                       <button onClick={handleGenerate}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 md:px-4 md:py-2 rounded-xl text-[11px] sm:text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
                         style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', boxShadow: '0 0 20px rgba(34,197,94,0.35)' }}>
                         <Play className="w-3.5 h-3.5 fill-current" />
                         <span className="sm:hidden">生成</span>
@@ -2494,15 +2495,15 @@ export default function HomePage() {
             </div>
 
             <div className="relative z-10 rounded-[14.5px] bg-[#16151f] border border-white/5 transition-all duration-300">
-              {/* 顶部 Tab + 展开按钮 */}
-              <div className="flex items-center justify-between px-3 md:px-4 pt-3 pb-1">
-                <div className="flex items-center gap-0.5 overflow-x-auto">
+              {/* 顶部 Tab（移动端缩小字号与内边距） */}
+              <div className="flex items-center justify-between px-2.5 md:px-4 pt-2.5 md:pt-3 pb-1">
+                <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar">
                   {['智能绘图', '智能扩图', '风格融合'].map((t) => (
                     <button
                       key={t}
                       onClick={() => setImgSubTab(t)}
                       className={cn(
-                        'flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap shrink-0',
+                        'flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs md:text-sm transition-colors whitespace-nowrap shrink-0',
                         imgSubTab === t ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'
                       )}
                     >
@@ -2536,7 +2537,7 @@ export default function HomePage() {
                   </button>
                 </div>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={imgPrompt}
                   onChange={e => {
                     setImgPrompt(e.target.value);
@@ -2552,7 +2553,7 @@ export default function HomePage() {
                         : "上传参考风格图与主体图，描述融合后的画面，例如：‘将主体图的人物置入参考图的赛博朋克霓虹街区风格中，红蓝霓虹光影’"
                   }
                   className={cn(
-                    "flex-1 min-w-0 bg-transparent resize-none text-sm text-white/80 placeholder:text-white/25 outline-none min-h-[72px] leading-relaxed transition-all duration-300",
+                    "flex-1 min-w-0 bg-transparent resize-none text-sm text-white/80 placeholder:text-white/25 outline-none min-h-[56px] sm:min-h-[72px] leading-relaxed transition-all duration-300",
                     enhancingImg && "enhancing-text-wave"
                   )}
                   disabled={imgGenerating}
@@ -2658,13 +2659,13 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* 底部工具栏 */}
-              <div className="flex items-center justify-between px-3 md:px-4 pb-3 pt-2 border-t border-white/5 gap-2 w-full">
-                <div className="flex items-center gap-1.5 py-0.5 pr-2">
+              {/* 底部工具栏（移动端缩小胶囊尺寸） */}
+              <div className="flex items-center justify-between px-2.5 md:px-4 pb-2.5 md:pb-3 pt-2 border-t border-white/5 gap-1.5 md:gap-2 w-full">
+                <div className="flex items-center gap-1 md:gap-1.5 py-0.5 md:pr-2 min-w-0">
                   {/* 模型选择 */}
                   <div className="relative">
                     <button onClick={() => { setImgModelOpen(o => !o); setImgResOpen(false); }}
-                      className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/15 text-xs text-pink-400 transition-colors border border-pink-500/20">
+                      className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/15 text-[11px] md:text-xs text-pink-400 transition-colors border border-pink-500/20">
                       <Sparkles className="w-3 h-3 text-pink-400" />
                       <span className="hidden sm:inline">{imgModel.label}</span>
                       <span className="sm:hidden">模型</span>
@@ -2704,14 +2705,14 @@ export default function HomePage() {
                   {/* 尺寸/比例 */}
                   <div className="relative">
                     <button onClick={() => { setImgResOpen(o => !o); setImgModelOpen(false); }}
-                      className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/15 text-xs text-purple-400 transition-colors border border-purple-500/20">
+                      className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/15 text-[11px] md:text-xs text-purple-400 transition-colors border border-purple-500/20">
                       <BarChart2 className="w-3 h-3 text-purple-400" />
                       <span className="hidden sm:inline">{imgResolution}</span>
                       <span className="sm:hidden">尺寸</span>
                       <ChevronDown className="w-3 h-3" />
                     </button>
                     {imgResOpen && (
-                      <div className="absolute top-full mt-2 left-0 z-50 bg-[#161522] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-4 w-[340px] space-y-4 text-white backdrop-blur-2xl">
+                      <div className="absolute top-full mt-2 left-0 z-50 bg-[#161522] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-3 md:p-4 w-[calc(100vw-2rem)] max-w-[340px] space-y-3 md:space-y-4 text-white backdrop-blur-2xl">
                         {/* 分辨率 */}
                         <div className="space-y-2">
                           <label className="text-[11px] text-white/40 block font-medium">分辨率</label>
@@ -2824,19 +2825,19 @@ export default function HomePage() {
 
                   {/* 提示词增强 */}
                   <button onClick={handleEnhanceImgPrompt} disabled={enhancingImg || imgGenerating}
-                    className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/15 text-xs text-pink-400 transition-colors border border-pink-500/20 disabled:opacity-40 shrink-0">
+                    className="flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/15 text-[11px] md:text-xs text-pink-400 transition-colors border border-pink-500/20 disabled:opacity-40 shrink-0">
                     {enhancingImg ? <Loader2 className="w-3 h-3 animate-spin text-pink-400" /> : <Sparkles className="w-3.5 h-3.5 text-pink-400" />}
                     <span className="hidden sm:inline">提示词增强</span>
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 md:gap-3 ml-auto">
+                <div className="flex items-center gap-1.5 md:gap-3 ml-auto">
                   {!imgGenerating && (
                     <button
                       type="button"
                       onClick={handleImgVoiceInput}
                       className={cn(
-                        "w-9 h-9 rounded-xl flex items-center justify-center transition-all border shrink-0",
+                        "w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center transition-all border shrink-0",
                         imgRecording
                           ? "animate-pulse border-red-500/50 text-red-500 bg-red-500/10"
                           : "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300"
@@ -2847,14 +2848,14 @@ export default function HomePage() {
                   )}
                   {imgGenerating ? (
                     <button onClick={() => { setImgGenerating(false); setImgProgress(0); }}
-                      className="flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:px-3 sm:py-2 rounded-xl text-sm font-semibold transition-all shrink-0"
+                      className="flex items-center justify-center gap-1.5 w-8 h-8 md:w-9 md:h-9 sm:w-auto sm:h-auto sm:px-3 sm:py-2 rounded-xl text-sm font-semibold transition-all shrink-0"
                       style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444' }}>
                       <X className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">取消</span>
                     </button>
                   ) : (
                     <button onClick={handleImageGenerate}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 md:px-4 md:py-2 rounded-xl text-[11px] sm:text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
                       style={{ background: 'linear-gradient(135deg,#ec4899,#8b5cf6)', color: '#fff', boxShadow: '0 0 20px rgba(236,72,153,0.35)' }}>
                       <ImageIcon className="w-3.5 h-3.5" />
                       <span className="sm:hidden">生成</span>
@@ -2870,8 +2871,8 @@ export default function HomePage() {
         {/* 生成结果视频 */}
         {resultVideo && mainTab === '视频生成' && (
           <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#13121b] mb-6">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-2 px-3 md:px-4 py-2.5 md:py-3 border-b border-white/8">
+              <div className="flex items-center gap-2 md:gap-3 flex-wrap min-w-0">
                 <span className="text-sm font-medium text-white/80">生成结果</span>
                 {selectedAvatar && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-500/15 border border-pink-500/30 text-xs text-pink-300">
@@ -2911,41 +2912,41 @@ export default function HomePage() {
         {/* ── 功能区、工具条、灵感广场（在生成及绘图选项下显示） ─────────────────── */}
         {mainTab !== '分镜编辑' && (
           <>
-            {/* ── 功能区 ────────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* ── 功能区（移动端缩小卡片内边距与字号） ────────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 md:gap-4">
               {/* 左侧大卡：作品素材 */}
-              <div className="lg:col-span-2 rounded-2xl p-6 flex flex-col justify-between min-h-[220px] relative overflow-hidden cursor-pointer group"
+              <div className="lg:col-span-2 rounded-2xl p-4 sm:p-6 flex flex-col justify-between min-h-[170px] sm:min-h-[220px] relative overflow-hidden cursor-pointer group"
                 style={{ background: 'linear-gradient(135deg,#1a1230 0%,#251840 100%)', border: '1px solid rgba(139,92,246,0.25)' }}
                 onClick={() => navigate('/works')}>
                 <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=280&fit=crop" alt="作品素材"
-                  className="absolute right-0 top-0 w-36 h-full object-cover opacity-30 group-hover:opacity-40 transition-opacity" />
-                <div className="relative z-10 space-y-2">
-                  <h3 className="text-xl font-bold">作品素材</h3>
-                  <p className="text-sm text-white/50">管理已生成的视频与上传的素材库</p>
-                  <div className="flex flex-wrap gap-1.5 pt-1">
+                  className="absolute right-0 top-0 w-28 sm:w-36 h-full object-cover opacity-30 group-hover:opacity-40 transition-opacity" />
+                <div className="relative z-10 space-y-1.5 md:space-y-2">
+                  <h3 className="text-base sm:text-xl font-bold">作品素材</h3>
+                  <p className="text-xs sm:text-sm text-white/50">管理已生成的视频与上传的素材库</p>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5 md:pt-1">
                     {['视频作品', '素材管理', '智能剪辑'].map(m => (
-                      <span key={m} className="text-[11px] px-2.5 py-0.5 rounded-full bg-white/8 text-white/60 border border-white/10">{m}</span>
+                      <span key={m} className="text-[10px] sm:text-[11px] px-2 sm:px-2.5 py-0.5 rounded-full bg-white/8 text-white/60 border border-white/10">{m}</span>
                     ))}
                   </div>
                 </div>
-                <button className="relative z-10 w-fit mt-4 px-5 py-2 rounded-full text-sm font-semibold text-white transition-all hover:scale-105"
+                <button className="relative z-10 w-fit mt-3 md:mt-4 px-4 py-1.5 md:px-5 md:py-2 rounded-full text-xs md:text-sm font-semibold text-white transition-all hover:scale-105"
                   style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}
                   onClick={e => { e.stopPropagation(); navigate('/works'); }}>
                   进入管理 →
                 </button>
               </div>
 
-              {/* 右侧 2×3 工具卡片 */}
-              <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+              {/* 右侧工具卡片（移动端缩小高度与字体） */}
+              <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
                 {QUICK_TOOLS.map(tool => (
                   <button key={tool.id} onClick={() => navigate(tool.path)}
-                    className="relative rounded-xl overflow-hidden group h-[90px] flex items-end p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                    className="relative rounded-xl overflow-hidden group h-[74px] sm:h-[90px] flex items-end p-2.5 sm:p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
                     style={{ background: '#1a1830', border: '1px solid rgba(255,255,255,0.07)' }}>
                     <img src={tool.cover} alt={tool.label} className="absolute inset-0 w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity" />
                     <div className={cn('absolute inset-0 bg-gradient-to-r opacity-60', tool.gradient)} />
                     <div className="relative z-10">
-                      <p className="text-sm font-semibold text-white">{tool.label}</p>
-                      <p className="text-[10px] text-white/50 leading-tight truncate">{tool.sub}</p>
+                      <p className="text-xs sm:text-sm font-semibold text-white">{tool.label}</p>
+                      <p className="text-[9px] sm:text-[10px] text-white/50 leading-tight truncate">{tool.sub}</p>
                     </div>
                   </button>
                 ))}
@@ -2955,9 +2956,9 @@ export default function HomePage() {
 
 
             {/* ── 灵感广场 ──────────────────────────────────────────────── */}
-            <div className="space-y-5">
+            <div className="space-y-3.5 md:space-y-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold">灵感广场</h2>
+                <h2 className="text-base md:text-lg font-bold">灵感广场</h2>
                 <button className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1">
                   More <ChevronRight className="w-3 h-3" />
                 </button>
@@ -2973,7 +2974,7 @@ export default function HomePage() {
                     <button
                       onClick={() => setActiveDropdown(activeDropdown === f.key ? null : f.key)}
                       className={cn(
-                        "flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors border",
+                        "flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-[11px] md:text-xs transition-colors border",
                         (f.key === 'model' && filterModel !== '全部') ||
                         (f.key === 'ratio' && filterRatio !== '全部') ||
                         (f.key === 'refImage' && filterRefImage !== '全部') ||
@@ -3036,7 +3037,7 @@ export default function HomePage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="搜索提示词或关键词"
-                    className="bg-transparent border-none outline-none text-white text-xs placeholder:text-white/20 w-44"
+                    className="bg-transparent border-none outline-none text-white text-xs placeholder:text-white/20 w-28 sm:w-44"
                   />
                   {searchQuery && (
                     <button onClick={() => setSearchQuery('')} className="ml-1 text-white/30 hover:text-white/60">

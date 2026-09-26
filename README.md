@@ -1,4 +1,4 @@
-# 🛒 Shopro AI - 跨境电商 AIGC 带货短视频创作与运营平台
+# 🛒 Shopro AI - 跨境电商 AIGC 带货短视频创作平台
 
 <p align="center">
   <img alt="React" src="https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react&logoColor=white" />
@@ -23,9 +23,8 @@
 
 <img width="1666" height="851" alt="image" src="https://github.com/user-attachments/assets/ab16fd76-7a2b-4ef4-875f-04436746a605" />
 <img width="1280" height="679" alt="image" src="https://github.com/user-attachments/assets/cf2db694-ed54-4606-b7ca-6ff22854d3fb" />
-<img width="1897" height="950" alt="image" src="https://github.com/user-attachments/assets/bc64aa29-0be2-4b06-add2-f0314fc93580" />
 
-**Shopro-AI 电商 AIGC 带货视频系统** 是一款面向国内外电商商家（如抖音、TikTok、小红书、Amazon、Shopee、Lazada 等）的企业级商业化 SaaS 平台。该系统通过深度融合先进的多模态大模型、思维链（CoT）营销方法论与工业级音视频渲染流水线，解决商家在短视频营销中面临的“文案撰写难、数字人/外籍演员贵、剪辑门槛高、多语言本地化差、跨平台发布与投后数据割裂”等核心痛点。
+**电商 AIGC 带货视频创作平台** 是一款面向国内外电商商家（如抖音、TikTok、小红书、Amazon、Shopee、Lazada 等）的企业级商业化 SaaS 平台。该系统通过深度融合先进的多模态大模型、思维链（CoT）营销方法论与工业级音视频渲染流水线，解决商家在短视频营销中面临的“文案撰写难、数字人/外籍演员贵、剪辑门槛高、多语言本地化差、跨平台发布与投后数据割裂”等核心痛点。
 
 系统构建了**商家端创作系统（`src/` - React 18 + Supabase） + 厂商运营后台管理中台（`backend/` - Vue 3 + Element Plus） + Model Context Protocol 智能体开放生态（`mcp/`）** 的三位一体全栈架构：
 1. **商家创作端 (`src/`)**：支持从「商品信息输入/URL 卖点提取 ➔ AI 智能脚本生成与提示词增强 ➔ 多模型视频生成矩阵（含用户自定义 OpenAI 兼容模型） ➔ 数字人选择与微表情映射 ➔ 多语言智能翻译 ➔ 分镜编辑 ➔ 素材混剪 ➔ 视频异步合成 ➔ 积分前置守卫、真实扣除与日志审计 ➔ 跨平台导出发布与数据回流」的完整商业闭环，将传统的五人工作流压缩为“一人 + AI”，帮助商家以极低成本高速量产高转化的爆款短视频。

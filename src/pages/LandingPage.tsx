@@ -598,13 +598,7 @@ const comparisonRows: ComparisonRow[] = [
 ];
 
 
-// ── 统计数据 ──────────────────────────────────────────────────────────────
-const stats = [
-  { value: 1798, suffix: '+', label: '已生成视频', icon: Video },
-  { value: 169, suffix: '+', label: '服务商家', icon: Users2 },
-  { value: 80, suffix: '%', label: '平均时间节省', icon: Zap },
-  { value: 61, suffix: '%', label: '平均完播率提升', icon: TrendingUp },
-];
+
 
 // ── 宣传视频播放器组件 ───────────────────────────────────────────────────
 function PromoVideoPlayer() {
@@ -867,7 +861,6 @@ export default function LandingPage() {
   const goToApp = () => navigate('/login');
 
   const { ref: radarRef, inView: radarInView } = useInView(0.2);
-  const { ref: statsRef, inView: statsInView } = useInView(0.2);
 
   return (
     <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: '#0a0c0f', color: '#fff' }}>
@@ -937,26 +930,7 @@ export default function LandingPage() {
         }}
       />
 
-      {/* ══════════════════════════════════════════════════════
-          统计数据
-      ══════════════════════════════════════════════════════ */}
-      <section ref={statsRef} className="py-16 border-y border-white/5" style={{ background: 'rgba(255,255,255,0.02)' }}>
-        <div className="max-w-5xl mx-auto px-4 md:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {stats.map(({ value, suffix, label, icon: Icon }) => (
-              <div key={label} className="text-center">
-                <div className="flex justify-center mb-2">
-                  <Icon className="w-5 h-5 text-white/30" />
-                </div>
-                <div className="text-3xl md:text-4xl font-extrabold text-white mb-1" style={{ color: '#FF6B00' }}>
-                  {statsInView ? <CountUp target={value} suffix={suffix} /> : <span>0{suffix}</span>}
-                </div>
-                <p className="text-sm text-white/40">{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* ══════════════════════════════════════════════════════
           宣传视频与用户画像
