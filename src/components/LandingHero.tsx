@@ -47,11 +47,12 @@ function HeroParticles() {
   );
 }
 
-// ── 轮播电商爆款商品数据（引用 public/shop 下的 6 张实拍图） ─────────────
+// ── 轮播电商爆款商品数据（引用 public/shop 下的高清极速 WebP 及 JPG 备份） ─────────────
 const shopProducts = [
   {
     id: 1,
-    image: '/shop/微信图片_20260925184513_156_352.jpg',
+    image: '/shop/phone_slide_1.webp',
+    fallbackImage: '/shop/phone_slide_1.jpg',
     title: '01 Pro Max 智能降噪蓝牙耳机',
     price: '299',
     originalPrice: '599',
@@ -64,7 +65,8 @@ const shopProducts = [
   },
   {
     id: 2,
-    image: '/shop/微信图片_20260925184513_157_352.jpg',
+    image: '/shop/phone_slide_2.webp',
+    fallbackImage: '/shop/phone_slide_2.jpg',
     title: '02 极光高定轻奢智能焕肤仪',
     price: '389',
     originalPrice: '799',
@@ -77,7 +79,8 @@ const shopProducts = [
   },
   {
     id: 3,
-    image: '/shop/微信图片_20260925184513_158_352.jpg',
+    image: '/shop/phone_slide_3.webp',
+    fallbackImage: '/shop/phone_slide_3.jpg',
     title: '03 潮流极简防泼水机能双肩包',
     price: '199',
     originalPrice: '399',
@@ -90,7 +93,8 @@ const shopProducts = [
   },
   {
     id: 4,
-    image: '/shop/微信图片_20260925184513_159_352.jpg',
+    image: '/shop/phone_slide_4.webp',
+    fallbackImage: '/shop/phone_slide_4.jpg',
     title: '04 4K超清电子防抖户外运动相机',
     price: '699',
     originalPrice: '1299',
@@ -103,7 +107,8 @@ const shopProducts = [
   },
   {
     id: 5,
-    image: '/shop/微信图片_20260925184513_160_352.jpg',
+    image: '/shop/phone_slide_5.webp',
+    fallbackImage: '/shop/phone_slide_5.jpg',
     title: '05 智能恒温双层便携随行咖啡杯',
     price: '149',
     originalPrice: '299',
@@ -116,7 +121,8 @@ const shopProducts = [
   },
   {
     id: 6,
-    image: '/shop/微信图片_20260925184513_161_352.jpg',
+    image: '/shop/phone_slide_6.webp',
+    fallbackImage: '/shop/phone_slide_6.jpg',
     title: '06 复古极光氛围感蓝牙黑胶立体声',
     price: '259',
     originalPrice: '499',
@@ -189,6 +195,23 @@ export default function LandingHero({ onGoToApp, onScrollToPromo }: LandingHeroP
       setToastMessage(prev => (prev === msg ? null : prev));
     }, 2200);
   };
+
+  // ── 轮播图极速预加载池：全量 WebP 内存预载，实现秒开与切换零卡顿 ──
+  const [_loadedImages, setLoadedImages] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    shopProducts.forEach((p, idx) => {
+      const img = new Image();
+      img.src = p.image;
+      img.onload = () => {
+        setLoadedImages(prev => ({ ...prev, [idx]: true }));
+      };
+      if (p.fallbackImage) {
+        const fallback = new Image();
+        fallback.src = p.fallbackImage;
+      }
+    });
+  }, []);
 
   // 移动端侦测与适配
   useEffect(() => {
@@ -488,28 +511,38 @@ export default function LandingHero({ onGoToApp, onScrollToPromo }: LandingHeroP
                 {/* 屏幕内芯：抖音/TikTok 直播全屏视窗（touch-manipulation 去除移动端 300ms 点击延迟） */}
                 <div className="relative w-full h-full rounded-[32px] bg-black overflow-hidden flex flex-col border border-white/10 select-none touch-manipulation">
 
-                  {/* ── 轮播商品主图（通透清晰，大幅减少暗色遮罩） ── */}
-                  <div className="absolute inset-0 z-0">
-                    {shopProducts.map((p, idx) => (
-                      <div
-                        key={p.id}
-                        className={cn(
-                          'absolute inset-0 transition-all duration-1000 ease-in-out',
-                          idx === currentIdx
-                            ? 'opacity-100 scale-100 z-10'
-                            : 'opacity-0 scale-105 pointer-events-none z-0'
-                        )}
-                      >
-                        <img
-                          src={p.image}
-                          alt={p.title}
-                          className="w-full h-full object-cover object-center filter brightness-[1.0] contrast-[1.03]"
-                        />
-                        {/* 仅在顶部与底部保留轻量渐变，保证文字易读的同时中间主体完全通透 */}
-                        <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-black/55 via-black/15 to-transparent pointer-events-none" />
-                        <div className="absolute bottom-0 inset-x-0 h-44 bg-gradient-to-t from-black/75 via-black/25 to-transparent pointer-events-none" />
-                      </div>
-                    ))}
+                  {/* ── 轮播商品主图（极速预加载、WebP+JPG 双通道、硬件加速防卡顿） ── */}
+                  <div className="absolute inset-0 z-0 bg-neutral-950 overflow-hidden">
+                    {shopProducts.map((p, idx) => {
+                      const isActive = idx === currentIdx;
+                      return (
+                        <div
+                          key={p.id}
+                          className={cn(
+                            'absolute inset-0 transition-all duration-700 ease-in-out will-change-[opacity,transform]',
+                            isActive
+                              ? 'opacity-100 scale-100 z-10'
+                              : 'opacity-0 scale-105 pointer-events-none z-0'
+                          )}
+                          style={{ transform: 'translateZ(0)' }}
+                        >
+                          <picture>
+                            <source srcSet={p.image} type="image/webp" />
+                            <img
+                              src={p.fallbackImage || p.image}
+                              alt={p.title}
+                              loading={idx === 0 ? 'eager' : 'lazy'}
+                              fetchPriority={idx === 0 ? 'high' : 'auto'}
+                              decoding={idx === 0 ? 'sync' : 'async'}
+                              className="w-full h-full object-cover object-center filter brightness-[1.0] contrast-[1.03]"
+                            />
+                          </picture>
+                          {/* 仅在顶部与底部保留轻量渐变，保证文字易读的同时中间主体完全通透 */}
+                          <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-black/55 via-black/15 to-transparent pointer-events-none" />
+                          <div className="absolute bottom-0 inset-x-0 h-44 bg-gradient-to-t from-black/75 via-black/25 to-transparent pointer-events-none" />
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* ────────────────────────────────────────────

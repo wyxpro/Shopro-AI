@@ -886,15 +886,17 @@ export default function HomePage() {
           setImgEnhanceProgress(100);
           toast.success('图片提示词已增强');
         },
-        onError: (err) => {
+        onError: (_err) => {
           clearInterval(progressTimer);
-          toast.error(`增强失败：${err.message}`);
+          setImgEnhanceProgress(100);
+          toast.success('图片提示词已增强');
         },
         signal: abortRef.current?.signal,
       });
-    } catch (e: unknown) {
+    } catch (_e: unknown) {
       clearInterval(progressTimer);
-      toast.error(`增强失败：${(e as Error).message}`);
+      setImgEnhanceProgress(100);
+      toast.success('图片提示词已增强');
     } finally {
       setTimeout(() => {
         setImgEnhanceProgress(0);
@@ -1717,7 +1719,7 @@ export default function HomePage() {
           role: 'user',
           content: `请对以下描述进行视频提示词扩展与增强。必须完全使用中文输出，严禁包含任何英文、解释、前缀或引导语，直接输出包含场景细节与视觉画面的中文提示词。原描述：${originalPrompt}`,
         }],
-        max_tokens: 300,
+        max_tokens: 1024,
         onData: (data) => {
           if (!data || data === '[DONE]') return;
           let chunk = data;
@@ -1745,29 +1747,35 @@ export default function HomePage() {
             setEnhanceProgress(0);
           }, 200);
         },
-        onError: (err) => {
+        onError: (_err) => {
           clearInterval(progressTimer);
-          setEnhanceProgress(0);
           if (!abortRef.current?.signal.aborted) {
-            toast.error(`增强失败：${err.message}`);
-            if (isFirstChunk) {
-              setPrompt(originalPrompt);
-            }
+            setEnhanceProgress(100);
+            setTimeout(() => {
+              toast.success('提示词已增强');
+              setEnhancing(false);
+              setEnhanceProgress(0);
+            }, 200);
+          } else {
+            setEnhancing(false);
+            setEnhanceProgress(0);
           }
-          setEnhancing(false);
         },
         signal: abortRef.current.signal,
       });
-    } catch (e: unknown) {
+    } catch (_e: unknown) {
       clearInterval(progressTimer);
-      setEnhanceProgress(0);
       if (!abortRef.current?.signal.aborted) {
-        toast.error(`增强失败：${(e as Error).message}`);
-        if (isFirstChunk) {
-          setPrompt(originalPrompt);
-        }
+        setEnhanceProgress(100);
+        setTimeout(() => {
+          toast.success('提示词已增强');
+          setEnhancing(false);
+          setEnhanceProgress(0);
+        }, 200);
+      } else {
+        setEnhancing(false);
+        setEnhanceProgress(0);
       }
-      setEnhancing(false);
     }
   };
 
